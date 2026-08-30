@@ -28,8 +28,8 @@ def find_dir_containing(marker_relpath, root=INPUT_ROOT, max_depth=4):
     layout here is /kaggle/input/{competitions,datasets}/..., not a flat
     /kaggle/input/<slug>/ as commonly assumed.\"\"\"
     for depth in range(max_depth + 1):
-        pattern = '/'.join(['*'] * depth) if depth else '.'
-        for candidate in root.glob(pattern):
+        candidates = [root] if depth == 0 else root.glob('/'.join(['*'] * depth))
+        for candidate in candidates:
             if candidate.is_dir() and (candidate / marker_relpath).exists():
                 return candidate
     raise FileNotFoundError(
