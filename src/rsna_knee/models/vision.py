@@ -91,6 +91,29 @@ class HFSlotEncoder(nn.Module):
         normalized = (images - self.mean) / self.std
         return self.backbone(pixel_values=normalized).pooler_output
 
+    def freeze_except_last_n_blocks(self, n: int) -> None:
+        """Freeze the patch/position embeddings and all but the last `n` transformer
+        blocks, per PLAN.md's rationale: a frozen self-supervised encoder has no
+        vocabulary for MRI signal, but early ViT blocks are generic edge/texture
+        filters where there's little supervision here to safely improve them, while
+        late blocks carry the semantics worth adapting. `layernorm` (which directly
+        feeds pooler_output) stays trainable regardless of `n`.
+        """
+        for param in self.backbone.embeddings.parameters():
+            param.requires_grad = False
+
+        layers = self.backbone.encoder.layer
+        n_frozen = max(0, len(layers) - n)
+        for layer in layers[:n_frozen]:
+            for param in layer.parameters():
+                param.requires_grad = False
+        for layer in layers[n_frozen:]:
+            for param in layer.parameters():
+                param.requires_grad = True
+
+        for param in self.backbone.layernorm.parameters():
+            param.requires_grad = True
+
 
 class KneeMultiLabelModel(nn.Module):
     def __init__(
@@ -124,3 +147,18 @@ class KneeMultiLabelModel(nn.Module):
         flat = images.view(b * s, c, h, w)
         embeddings = self.encoder(flat).view(b, s, -1)
         return self.head(embeddings, presence_mask)
+
+    def discriminative_param_groups(self, encoder_lr: float, head_lr: float) -> list[dict]:
+        """Two optimizer param groups: a low LR for the (partially unfrozen) encoder,
+        a higher LR for the randomly-initialized head. Per PLAN.md: the head has
+        everything to learn from a random start, while the encoder starts from a good
+        solution and only needs to be nudged off it -- one shared LR would either
+        leave the head undertrained or wreck the encoder in the first few steps.
+        Frozen encoder parameters (requires_grad=False) are excluded entirely, since
+        handing them to the optimizer would be dead weight.
+        """
+        encoder_params = [p for p in self.encoder.parameters() if p.requires_grad]
+        return [
+            {"params": encoder_params, "lr": encoder_lr},
+            {"params": self.head.parameters(), "lr": head_lr},
+        ]

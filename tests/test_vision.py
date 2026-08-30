@@ -12,6 +12,31 @@ from rsna_knee.models.vision import (
 )
 
 
+class _FakeDinov2Layer(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.linear = nn.Linear(4, 4)
+
+
+class _FakeDinov2Backbone(nn.Module):
+    """Stands in for the real Dinov2Model's structure (embeddings / encoder.layer /
+    layernorm) so freeze_except_last_n_blocks can be tested without downloading real
+    weights."""
+
+    def __init__(self, n_layers: int = 12):
+        super().__init__()
+        self.config = MagicMock(hidden_size=4)
+        self.embeddings = nn.Linear(4, 4)
+        self.encoder = MagicMock()
+        self.encoder.layer = nn.ModuleList([_FakeDinov2Layer() for _ in range(n_layers)])
+        self.layernorm = nn.LayerNorm(4)
+
+    def forward(self, pixel_values):
+        result = MagicMock()
+        result.pooler_output = torch.zeros(pixel_values.shape[0], 4)
+        return result
+
+
 def test_slot_attention_head_output_shape():
     torch.manual_seed(0)
     head = SlotAttentionHead(embed_dim=16, num_slots=6, num_labels=12, attn_dim=8)
@@ -134,3 +159,62 @@ def test_full_model_uses_hf_encoder_when_path_given():
     assert logits.shape == (2, 12)
     assert torch.isfinite(logits).all()
     assert isinstance(model.encoder, HFSlotEncoder)
+
+
+def _make_hf_encoder_with_fake_backbone(n_layers: int = 12) -> tuple[HFSlotEncoder, MagicMock]:
+    fake_backbone = _FakeDinov2Backbone(n_layers=n_layers)
+    with patch("transformers.AutoModel.from_pretrained", return_value=fake_backbone):
+        encoder = HFSlotEncoder(pretrained_path="fake/local/path")
+    return encoder, fake_backbone
+
+
+def test_freeze_except_last_n_blocks_freezes_embeddings_and_early_layers():
+    encoder, backbone = _make_hf_encoder_with_fake_backbone(n_layers=12)
+    encoder.freeze_except_last_n_blocks(2)
+
+    assert all(not p.requires_grad for p in backbone.embeddings.parameters())
+    for layer in backbone.encoder.layer[:10]:
+        assert all(not p.requires_grad for p in layer.parameters())
+    for layer in backbone.encoder.layer[10:]:
+        assert all(p.requires_grad for p in layer.parameters())
+    assert all(p.requires_grad for p in backbone.layernorm.parameters())
+
+
+def test_freeze_except_last_n_blocks_zero_freezes_everything_but_layernorm():
+    encoder, backbone = _make_hf_encoder_with_fake_backbone(n_layers=12)
+    encoder.freeze_except_last_n_blocks(0)
+
+    assert all(not p.requires_grad for p in backbone.embeddings.parameters())
+    for layer in backbone.encoder.layer:
+        assert all(not p.requires_grad for p in layer.parameters())
+    assert all(p.requires_grad for p in backbone.layernorm.parameters())
+
+
+def test_freeze_except_last_n_blocks_n_exceeding_layer_count_unfreezes_all_layers():
+    encoder, backbone = _make_hf_encoder_with_fake_backbone(n_layers=12)
+    encoder.freeze_except_last_n_blocks(100)
+
+    for layer in backbone.encoder.layer:
+        assert all(p.requires_grad for p in layer.parameters())
+
+
+def test_discriminative_param_groups_excludes_frozen_params():
+    fake_backbone = _FakeDinov2Backbone(n_layers=12)
+    with patch("transformers.AutoModel.from_pretrained", return_value=fake_backbone):
+        model = KneeMultiLabelModel(num_slots=6, num_labels=12, hf_pretrained_path="fake/path")
+    model.encoder.freeze_except_last_n_blocks(2)
+
+    groups = model.discriminative_param_groups(encoder_lr=1e-5, head_lr=1e-3)
+    assert len(groups) == 2
+    assert groups[0]["lr"] == 1e-5
+    assert groups[1]["lr"] == 1e-3
+
+    encoder_group_params = set(id(p) for p in groups[0]["params"])
+    # every param in the encoder's low-LR group must require grad (frozen ones excluded)
+    assert all(p.requires_grad for p in groups[0]["params"])
+    # the frozen embeddings params must NOT be in the optimizer's param groups at all
+    frozen_ids = set(id(p) for p in fake_backbone.embeddings.parameters())
+    assert frozen_ids.isdisjoint(encoder_group_params)
+
+    head_group_params = set(id(p) for p in groups[1]["params"])
+    assert head_group_params == set(id(p) for p in model.head.parameters())
