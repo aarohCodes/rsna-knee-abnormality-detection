@@ -1,0 +1,14 @@
+{
+  "id": "aarohnanoti/rsna-knee-submission-v0",
+  "title": "rsna-knee-submission-v0",
+  "code_file": "submission_kernel.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": ["aarohnanoti/rsna-knee-src", "pilkwang/rsna-knee-llm-labels"],
+  "competition_sources": ["rsna-knee-abnormality-detection"],
+  "kernel_sources": []
+}
