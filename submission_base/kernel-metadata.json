@@ -1,0 +1,16 @@
+{
+  "id": "aarohnanoti/rsna-knee-dinov2-base",
+  "title": "rsna-knee-dinov2-base",
+  "code_file": "submission_kernel.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": ["aarohnanoti/rsna-knee-src", "stevenleehans/rsna-knee-llm-report-labels"],
+  "competition_sources": ["rsna-knee-abnormality-detection"],
+  "kernel_sources": [],
+  "model_sources": ["metaresearch/dinov2/pytorch/base/1"]
+}
