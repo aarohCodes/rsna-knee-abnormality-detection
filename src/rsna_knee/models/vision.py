@@ -14,6 +14,13 @@ from torch import nn
 
 NEG_INF = -1e9
 
+# Standard ImageNet normalization stats DINOv2 (and most ImageNet-pretrained ViT/CNN
+# backbones) were trained with. Our own preprocessing pipeline (dicom_io/preprocess.py)
+# already produces percentile-normalized [0, 1] images -- this is an additional,
+# backbone-specific normalization layered on top, not a replacement for it.
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
+
 
 class SlotAttentionHead(nn.Module):
     """Per-diagnosis masked attention pooling over slot embeddings.
@@ -62,6 +69,29 @@ class SlotEncoder(nn.Module):
         return self.backbone(images)
 
 
+class HFSlotEncoder(nn.Module):
+    """Wraps a HuggingFace `transformers` vision backbone (e.g. DINOv2) loaded from a
+    local path -- Kaggle's DINOv2 Model source ships in `transformers` format
+    (AutoModel.from_pretrained), not timm, so it needs its own loading path. Applies
+    ImageNet normalization on top of our own [0, 1] preprocessing, matching what these
+    backbones were trained with (see preprocessor_config.json on the model source).
+    """
+
+    def __init__(self, pretrained_path: str):
+        super().__init__()
+        from transformers import AutoModel  # local import: only needed for this path
+
+        self.backbone = AutoModel.from_pretrained(pretrained_path)
+        self.embed_dim = self.backbone.config.hidden_size
+        self.register_buffer("mean", torch.tensor(IMAGENET_MEAN).view(1, 3, 1, 1))
+        self.register_buffer("std", torch.tensor(IMAGENET_STD).view(1, 3, 1, 1))
+
+    def forward(self, images: torch.Tensor) -> torch.Tensor:
+        """images: (B*S, C, H, W) in [0, 1] -> (B*S, embed_dim)."""
+        normalized = (images - self.mean) / self.std
+        return self.backbone(pixel_values=normalized).pooler_output
+
+
 class KneeMultiLabelModel(nn.Module):
     def __init__(
         self,
@@ -70,9 +100,17 @@ class KneeMultiLabelModel(nn.Module):
         backbone_name: str = "efficientnet_b0",
         pretrained: bool = True,
         attn_dim: int = 128,
+        hf_pretrained_path: str | None = None,
     ):
+        """If `hf_pretrained_path` is set, uses HFSlotEncoder (a local HuggingFace
+        `transformers` checkpoint, e.g. a mounted Kaggle DINOv2 Model source) and
+        ignores `backbone_name`/`pretrained`; otherwise uses the timm-based SlotEncoder.
+        """
         super().__init__()
-        self.encoder = SlotEncoder(backbone_name, pretrained=pretrained)
+        if hf_pretrained_path is not None:
+            self.encoder = HFSlotEncoder(hf_pretrained_path)
+        else:
+            self.encoder = SlotEncoder(backbone_name, pretrained=pretrained)
         self.head = SlotAttentionHead(
             embed_dim=self.encoder.embed_dim,
             num_slots=num_slots,

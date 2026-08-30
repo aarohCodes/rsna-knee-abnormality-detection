@@ -1,6 +1,15 @@
-import torch
+from unittest.mock import MagicMock, patch
 
-from rsna_knee.models.vision import KneeMultiLabelModel, SlotAttentionHead
+import torch
+from torch import nn
+
+from rsna_knee.models.vision import (
+    IMAGENET_MEAN,
+    IMAGENET_STD,
+    HFSlotEncoder,
+    KneeMultiLabelModel,
+    SlotAttentionHead,
+)
 
 
 def test_slot_attention_head_output_shape():
@@ -67,3 +76,61 @@ def test_full_model_forward_shape_no_pretrained_download():
         logits = model(images, presence_mask)
     assert logits.shape == (2, 12)
     assert torch.isfinite(logits).all()
+
+
+class _FakeHFBackbone(nn.Module):
+    """Stands in for a `transformers` AutoModel instance without downloading or
+    loading real weights -- records the pixel_values it was called with so tests can
+    verify HFSlotEncoder's normalization, and returns a pooler_output of the
+    requested embedding dimension."""
+
+    def __init__(self, hidden_size: int):
+        super().__init__()
+        self.config = MagicMock(hidden_size=hidden_size)
+        self.hidden_size = hidden_size
+        self.received_pixel_values: torch.Tensor | None = None
+
+    def forward(self, pixel_values: torch.Tensor):
+        self.received_pixel_values = pixel_values
+        result = MagicMock()
+        result.pooler_output = torch.zeros(pixel_values.shape[0], self.hidden_size)
+        return result
+
+
+def test_hf_slot_encoder_applies_imagenet_normalization():
+    fake_backbone = _FakeHFBackbone(hidden_size=8)
+    with patch("transformers.AutoModel.from_pretrained", return_value=fake_backbone):
+        encoder = HFSlotEncoder(pretrained_path="fake/local/path")
+
+    images = torch.rand(3, 3, 32, 32)  # our pipeline always produces [0, 1] images
+    out = encoder(images)
+
+    assert out.shape == (3, 8)
+    mean = torch.tensor(IMAGENET_MEAN).view(1, 3, 1, 1)
+    std = torch.tensor(IMAGENET_STD).view(1, 3, 1, 1)
+    expected = (images - mean) / std
+    assert torch.allclose(fake_backbone.received_pixel_values, expected, atol=1e-6)
+
+
+def test_hf_slot_encoder_embed_dim_from_config():
+    fake_backbone = _FakeHFBackbone(hidden_size=384)  # DINOv2-small's real hidden_size
+    with patch("transformers.AutoModel.from_pretrained", return_value=fake_backbone):
+        encoder = HFSlotEncoder(pretrained_path="fake/local/path")
+    assert encoder.embed_dim == 384
+
+
+def test_full_model_uses_hf_encoder_when_path_given():
+    fake_backbone = _FakeHFBackbone(hidden_size=8)
+    with patch("transformers.AutoModel.from_pretrained", return_value=fake_backbone):
+        model = KneeMultiLabelModel(
+            num_slots=6, num_labels=12, hf_pretrained_path="fake/local/path"
+        )
+    model.eval()
+
+    images = torch.rand(2, 6, 3, 32, 32)
+    presence_mask = torch.ones(2, 6)
+    with torch.no_grad():
+        logits = model(images, presence_mask)
+    assert logits.shape == (2, 12)
+    assert torch.isfinite(logits).all()
+    assert isinstance(model.encoder, HFSlotEncoder)
