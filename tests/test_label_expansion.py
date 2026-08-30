@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
+import pytest
 
-from rsna_knee.data.label_expansion import GOLD_WEIGHT, build_training_targets
+from rsna_knee.data.label_expansion import GOLD_WEIGHT, add_derived_confidence, build_training_targets
 from rsna_knee.metrics import LABEL_COLUMNS
 
 
@@ -76,3 +77,53 @@ def test_output_covers_every_input_study_exactly_once():
     out = build_training_targets(train, silver)
     assert sorted(out["StudyInstanceUID"]) == ["a", "b", "c"]
     assert len(out) == 3
+
+
+def test_add_derived_confidence_saturated_scores_get_full_weight():
+    df = pd.DataFrame({"StudyInstanceUID": ["s1"], **{col: [1.0] for col in LABEL_COLUMNS}})
+    out = add_derived_confidence(df)
+    for col in LABEL_COLUMNS:
+        assert out.loc[0, f"{col}__conf"] == pytest.approx(1.0)
+
+    df0 = pd.DataFrame({"StudyInstanceUID": ["s1"], **{col: [0.0] for col in LABEL_COLUMNS}})
+    out0 = add_derived_confidence(df0)
+    for col in LABEL_COLUMNS:
+        assert out0.loc[0, f"{col}__conf"] == pytest.approx(1.0)
+
+
+def test_add_derived_confidence_midpoint_score_gets_zero_weight():
+    df = pd.DataFrame({"StudyInstanceUID": ["s1"], **{col: [0.5] for col in LABEL_COLUMNS}})
+    out = add_derived_confidence(df)
+    for col in LABEL_COLUMNS:
+        assert out.loc[0, f"{col}__conf"] == pytest.approx(0.0)
+
+
+def test_add_derived_confidence_scales_linearly_from_midpoint():
+    df = pd.DataFrame({"StudyInstanceUID": ["s1", "s2"], "ACL": [0.75, 0.25]})
+    out = add_derived_confidence(df, label_columns=["ACL"])
+    assert out.loc[0, "ACL__conf"] == pytest.approx(0.5)  # |0.75-0.5|*2
+    assert out.loc[1, "ACL__conf"] == pytest.approx(0.5)  # |0.25-0.5|*2, symmetric
+
+
+def test_add_derived_confidence_preserves_original_columns():
+    df = pd.DataFrame({"StudyInstanceUID": ["s1"], "ACL": [0.7]})
+    out = add_derived_confidence(df, label_columns=["ACL"])
+    assert out.loc[0, "ACL"] == 0.7  # original score column untouched
+    assert "StudyInstanceUID" in out.columns
+
+
+def test_derived_confidence_feeds_build_training_targets_correctly():
+    """End-to-end: a source with no native confidence, run through
+    add_derived_confidence, should behave identically to a native-confidence source
+    with the same values through build_training_targets."""
+    train = _train_labels([{"id": "s1"}])
+    silver_no_conf = pd.DataFrame({"StudyInstanceUID": ["s1"], "ACL": [0.9]})
+    for col in LABEL_COLUMNS:
+        if col != "ACL":
+            silver_no_conf[col] = 0.5
+    silver_with_conf = add_derived_confidence(silver_no_conf)
+
+    out = build_training_targets(train, silver_with_conf)
+    row = out[out["StudyInstanceUID"] == "s1"].iloc[0]
+    assert row["ACL"] == pytest.approx(0.9)
+    assert row["ACL__weight"] == pytest.approx(0.8)  # |0.9-0.5|*2
