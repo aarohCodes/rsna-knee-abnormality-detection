@@ -22,17 +22,35 @@ OUT_DIR = Path('/kaggle/working')
 print('Contents of /kaggle/input:', sorted(p.name for p in INPUT_ROOT.iterdir()))
 
 
+_SKIP_DIR_NAMES = {'train_series', 'test_series'}
+
+
 def find_dir_containing(marker_relpath, root=INPUT_ROOT, max_depth=8):
-    \"\"\"Search /kaggle/input at increasing depth for a directory containing
+    \"\"\"Breadth-first search under /kaggle/input for a directory containing
     `marker_relpath`, instead of assuming a fixed mount layout. Confirmed
     inconsistent across source types: competitions nest under 'competitions/<slug>/',
     some datasets mount flat at the top level, others nest under
-    'datasets/<owner>/<name>/', and Model sources nest deepest (depth 5-6).\"\"\"
-    for depth in range(max_depth + 1):
-        candidates = [root] if depth == 0 else root.glob('/'.join(['*'] * depth))
-        for candidate in candidates:
-            if candidate.is_dir() and (candidate / marker_relpath).exists():
+    'datasets/<owner>/<name>/', and Model sources nest deepest (depth 5-6).
+
+    Prunes train_series/test_series before descending into them -- same lesson as
+    the public baseline notebook's cover-image loader: the competition mount holds
+    hundreds of thousands of per-study/per-series directories, and none of our
+    markers live inside them. A naive glob-at-each-depth search doesn't prune, and
+    ends up enumerating that entire tree once search depth reaches it -- confirmed
+    costing ~8 minutes per kernel run before this fix.
+    \"\"\"
+    frontier = [root]
+    for _ in range(max_depth + 1):
+        next_frontier = []
+        for candidate in frontier:
+            if (candidate / marker_relpath).exists():
                 return candidate
+            try:
+                children = [c for c in candidate.iterdir() if c.is_dir() and c.name not in _SKIP_DIR_NAMES]
+            except OSError:
+                continue
+            next_frontier.extend(children)
+        frontier = next_frontier
     raise FileNotFoundError(
         f'Could not find a directory containing {marker_relpath!r} under {root} '
         f'(searched up to depth {max_depth}). Top-level contents: '
