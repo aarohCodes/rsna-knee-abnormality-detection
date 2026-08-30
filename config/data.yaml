@@ -1,0 +1,45 @@
+seed: 42
+
+competition: rsna-knee-abnormality-detection
+
+paths:
+  raw_dir: data/raw
+  interim_dir: data/interim
+  processed_dir: data/processed
+  train_csv: data/raw/train.csv
+  train_series_csv: data/raw/train_series.csv
+  test_csv: data/raw/test.csv
+  test_series_csv: data/raw/test_series.csv
+  sample_submission_csv: data/raw/sample_submission.csv
+  train_series_dir: data/raw/train_series
+  test_series_dir: data/raw/test_series
+
+label_columns:
+  - ACL
+  - MCL
+  - Medial Meniscus
+  - Lateral Meniscus
+  - Medial OA
+  - Lateral OA
+  - PF OA
+  - Effusion
+  - Synovitis
+  - Baker's
+  - Contusion
+  - Fracture
+
+series_slots:
+  - SAG_FLUID_FS
+  - COR_FLUID_FS
+  - AX_FLUID_FS
+  - SAG_FLUID_NOFS
+  - COR_T1
+  - SAG_T1
+
+cv:
+  n_folds: 5
+  group_keys: [StudyInstanceUID, report_hash]
+
+image:
+  physical_crop_mm: 130
+  resize_px: 336
