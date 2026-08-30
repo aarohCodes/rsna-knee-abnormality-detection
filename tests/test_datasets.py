@@ -143,3 +143,31 @@ def test_cached_output_matches_uncached_output():
 
     assert (first["images"] == second["images"]).all()
     assert (first["presence_mask"] == second["presence_mask"]).all()
+
+
+def test_center_fraction_defaults_to_middle():
+    study_id = "study_1"
+    series_df = _series_with_slots(study_id)
+    targets = _targets(study_id)
+    dataset = StudyDataset(
+        [study_id], series_df, series_root="fake_root", targets=targets, cache_images=False
+    )
+    assert dataset.center_fraction == 0.5
+
+
+def test_center_fraction_passed_through_to_load_series_representative():
+    study_id = "study_1"
+    series_df = _series_with_slots(study_id)
+    targets = _targets(study_id)
+    dataset = StudyDataset(
+        [study_id], series_df, series_root="fake_root", targets=targets,
+        cache_images=False, center_fraction=0.35,
+    )
+
+    fake_image = np.full((dataset.resize_px, dataset.resize_px), 0.5, dtype=np.float32)
+    with patch(
+        "rsna_knee.datasets.load_series_representative", return_value=fake_image
+    ) as mock_load:
+        dataset[0]
+
+    assert mock_load.call_args.kwargs["center_fraction"] == 0.35

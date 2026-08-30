@@ -16,8 +16,10 @@ from torch.utils.data import DataLoader
 
 from rsna_knee.data.series import assign_slots
 from rsna_knee.datasets import StudyDataset
-from rsna_knee.metrics import LABEL_COLUMNS
+from rsna_knee.metrics import LABEL_COLUMNS, rank_average
 from rsna_knee.models.vision import KneeMultiLabelModel
+
+DEFAULT_TTA_CENTER_FRACTIONS = (0.35, 0.5, 0.65)
 
 
 def run_inference(
@@ -27,16 +29,21 @@ def run_inference(
     series_root: Path,
     device: str,
     batch_size: int = 4,
+    center_fraction: float = 0.5,
 ) -> pd.DataFrame:
     """Run `model` over every study in `study_ids` and return a dataframe shaped
     exactly like sample_submission.csv (StudyInstanceUID + the 12 label columns,
-    sigmoid-activated probabilities).
+    sigmoid-activated probabilities). `center_fraction` selects which slice-window
+    each series is sampled from (0.5 = middle, the default) -- see
+    run_inference_tta for combining multiple values.
     """
     # StudyDataset needs a `targets` frame; inference has no real targets, so pass an
     # empty one -- every study falls through to the neutral/zero-weight branch, which
     # is fine since targets/weights aren't used at inference time.
     empty_targets = pd.DataFrame({"StudyInstanceUID": []})
-    dataset = StudyDataset(study_ids, series_with_slots, series_root, empty_targets)
+    dataset = StudyDataset(
+        study_ids, series_with_slots, series_root, empty_targets, center_fraction=center_fraction
+    )
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
     model.eval()
@@ -51,6 +58,32 @@ def run_inference(
                 rows.append({"StudyInstanceUID": study_id, **dict(zip(LABEL_COLUMNS, row_probs))})
 
     return pd.DataFrame(rows, columns=["StudyInstanceUID", *LABEL_COLUMNS])
+
+
+def run_inference_tta(
+    model: torch.nn.Module,
+    study_ids: list[str],
+    series_with_slots: pd.DataFrame,
+    series_root: Path,
+    device: str,
+    batch_size: int = 4,
+    center_fractions: tuple[float, ...] = DEFAULT_TTA_CENTER_FRACTIONS,
+) -> pd.DataFrame:
+    """Test-time augmentation: run inference once per `center_fractions` value (each
+    sampling a different, overlapping-but-distinct slice window per series) and
+    combine by rank average -- not raw probability averaging, since AUC only reads
+    order and a raw average would let whichever pass produced more extreme values
+    dominate (see metrics.rank_average). Each pass reuses `run_inference`, so this is
+    the same tested code path repeated with a different `center_fraction`, not a
+    separate implementation.
+    """
+    passes = [
+        run_inference(
+            model, study_ids, series_with_slots, series_root, device, batch_size, center_fraction=cf
+        )
+        for cf in center_fractions
+    ]
+    return rank_average(passes)
 
 
 def write_trivial_submission(sample_submission_path: Path, out_path: Path) -> None:

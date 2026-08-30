@@ -184,11 +184,16 @@ def load_series_representative(
     physical_crop_mm: float = DEFAULT_PHYSICAL_CROP_MM,
     resize_px: int = DEFAULT_RESIZE_PX,
     n_percentile_slices: int = 5,
+    center_fraction: float = 0.5,
 ) -> np.ndarray | None:
     """Load one representative, preprocessed image for a series: order its slices by
-    true spatial position, take the middle slice, crop to a fixed physical FOV, resize
-    to a Nyquist-adequate pixel pitch, and percentile-normalize using a small sample of
-    slices around the middle (not just the one slice) for a more stable intensity range.
+    true spatial position, take the slice at `center_fraction` through the ordered
+    stack (0.5 = middle, the default), crop to a fixed physical FOV, resize to a
+    Nyquist-adequate pixel pitch, and percentile-normalize using a small sample of
+    slices around that center (not just the one slice) for a more stable intensity
+    range. `center_fraction` != 0.5 is for multi-crop TTA at inference time -- e.g.
+    0.35/0.5/0.65 sample three different, overlapping-but-distinct views of the same
+    series to average over, rather than relying on a single slice choice.
 
     Returns None if the series has no decodable slices or none of them survive the
     physical-FOV crop (their acquired field of view is smaller than the crop target).
@@ -215,11 +220,12 @@ def load_series_representative(
     path_to_ds = {p: ds for p, ds in datasets}
     ordered_ds = [path_to_ds[p] for p in ordered_paths]
 
-    mid = len(ordered_ds) // 2
+    center = int(round(center_fraction * (len(ordered_ds) - 1)))
+    center = max(0, min(len(ordered_ds) - 1, center))
     half_window = n_percentile_slices // 2
-    sample_idx = range(max(0, mid - half_window), min(len(ordered_ds), mid + half_window + 1))
+    sample_idx = range(max(0, center - half_window), min(len(ordered_ds), center + half_window + 1))
 
-    pixel_spacing = getattr(ordered_ds[mid], "PixelSpacing", None)
+    pixel_spacing = getattr(ordered_ds[center], "PixelSpacing", None)
     if pixel_spacing is None:
         return None
     pixel_spacing = (float(pixel_spacing[0]), float(pixel_spacing[1]))

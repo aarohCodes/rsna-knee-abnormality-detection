@@ -37,6 +37,7 @@ class StudyDataset(Dataset):
         resize_px: int = DEFAULT_RESIZE_PX,
         cache_images: bool = True,
         max_cache_studies: int = DEFAULT_MAX_CACHE_STUDIES,
+        center_fraction: float = 0.5,
     ):
         self.study_ids = list(study_ids)
         self.series_by_study = {
@@ -48,6 +49,10 @@ class StudyDataset(Dataset):
         self.resize_px = resize_px
         self.cache_images = cache_images
         self.max_cache_studies = max_cache_studies
+        # Which slice-window to sample per series (0.5 = middle, the default). TTA
+        # varies this across several StudyDataset instances at inference time and
+        # combines their predictions -- see infer.run_inference_tta.
+        self.center_fraction = center_fraction
         # DICOM decode dominates cost -- caching per study avoids re-decoding on every
         # epoch. Only helps beyond one epoch if the DataLoader keeps worker processes
         # alive across epochs (persistent_workers=True when num_workers>0); PyTorch
@@ -74,7 +79,9 @@ class StudyDataset(Dataset):
             if matches.empty:
                 continue
             series_dir = self.series_root / study_id / matches.iloc[0]["SeriesInstanceUID"]
-            img = load_series_representative(series_dir, self.physical_crop_mm, self.resize_px)
+            img = load_series_representative(
+                series_dir, self.physical_crop_mm, self.resize_px, center_fraction=self.center_fraction
+            )
             if img is not None:
                 images[slot_idx] = img
                 mask[slot_idx] = 1.0
@@ -85,7 +92,9 @@ class StudyDataset(Dataset):
             # than feeding the model an all-masked study (undefined softmax).
             for _, row in series_rows.iterrows():
                 series_dir = self.series_root / study_id / row["SeriesInstanceUID"]
-                img = load_series_representative(series_dir, self.physical_crop_mm, self.resize_px)
+                img = load_series_representative(
+                series_dir, self.physical_crop_mm, self.resize_px, center_fraction=self.center_fraction
+            )
                 if img is not None:
                     images[0] = img
                     mask[0] = 1.0
