@@ -17,6 +17,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import pydicom
+
+from rsna_knee.data.preprocess import (
+    DEFAULT_PHYSICAL_CROP_MM,
+    DEFAULT_RESIZE_PX,
+    center_crop_to_physical_extent,
+    normalize_intensity,
+    resize_to,
+)
 
 SERIES_SLOTS = [
     "SAG_FLUID_FS",
@@ -168,3 +177,68 @@ def classify_slot(
     if plane == "SAG" and weighting == "T1" and not fat_suppressed:
         return "SAG_T1"
     return None
+
+
+def load_series_representative(
+    series_dir: Path,
+    physical_crop_mm: float = DEFAULT_PHYSICAL_CROP_MM,
+    resize_px: int = DEFAULT_RESIZE_PX,
+    n_percentile_slices: int = 5,
+) -> np.ndarray | None:
+    """Load one representative, preprocessed image for a series: order its slices by
+    true spatial position, take the middle slice, crop to a fixed physical FOV, resize
+    to a Nyquist-adequate pixel pitch, and percentile-normalize using a small sample of
+    slices around the middle (not just the one slice) for a more stable intensity range.
+
+    Returns None if the series has no decodable slices or none of them survive the
+    physical-FOV crop (their acquired field of view is smaller than the crop target).
+    """
+    paths = sorted(series_dir.glob("*.dcm"))
+    if not paths:
+        return None
+
+    datasets = []
+    geometries = []
+    for p in paths:
+        try:
+            ds = pydicom.dcmread(p)
+        except Exception:
+            continue
+        geom = geometry_from_dataset(ds)
+        datasets.append((p, ds))
+        geometries.append(geom)
+
+    if not datasets:
+        return None
+
+    ordered_paths = order_slices(list(zip((p for p, _ in datasets), geometries)))
+    path_to_ds = {p: ds for p, ds in datasets}
+    ordered_ds = [path_to_ds[p] for p in ordered_paths]
+
+    mid = len(ordered_ds) // 2
+    half_window = n_percentile_slices // 2
+    sample_idx = range(max(0, mid - half_window), min(len(ordered_ds), mid + half_window + 1))
+
+    pixel_spacing = getattr(ordered_ds[mid], "PixelSpacing", None)
+    if pixel_spacing is None:
+        return None
+    pixel_spacing = (float(pixel_spacing[0]), float(pixel_spacing[1]))
+
+    cropped_slices = []
+    for i in sample_idx:
+        try:
+            arr = ordered_ds[i].pixel_array.astype(np.float32)
+        except Exception:
+            continue
+        cropped = center_crop_to_physical_extent(arr, pixel_spacing, physical_crop_mm)
+        if cropped is None:
+            return None
+        cropped_slices.append(cropped)
+
+    if not cropped_slices:
+        return None
+
+    stack = np.stack(cropped_slices, axis=0)
+    normalized = normalize_intensity(stack)
+    representative = normalized[len(normalized) // 2]
+    return resize_to(representative, resize_px)
