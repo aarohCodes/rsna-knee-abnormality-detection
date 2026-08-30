@@ -117,8 +117,11 @@ series_subset = train_series_csv[train_series_csv['StudyInstanceUID'].isin(study
 series_with_slots = assign_slots(series_subset, train_series_dir)
 
 train_dataset = StudyDataset(study_ids, series_with_slots, train_series_dir, targets)
+# persistent_workers=True is required for the dataset's per-study image cache to help
+# beyond the first epoch -- PyTorch respawns worker processes every epoch by default,
+# which would otherwise silently discard each worker's in-process cache every time.
 train_loader = torch.utils.data.DataLoader(
-    train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2
+    train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, persistent_workers=True
 )
 print('train dataset size:', len(train_dataset))
 """,

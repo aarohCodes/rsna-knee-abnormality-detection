@@ -26,6 +26,7 @@ class StudyDataset(Dataset):
         targets: pd.DataFrame,
         physical_crop_mm: float = DEFAULT_PHYSICAL_CROP_MM,
         resize_px: int = DEFAULT_RESIZE_PX,
+        cache_images: bool = True,
     ):
         self.study_ids = list(study_ids)
         self.series_by_study = {
@@ -35,12 +36,21 @@ class StudyDataset(Dataset):
         self.targets = targets.set_index("StudyInstanceUID")
         self.physical_crop_mm = physical_crop_mm
         self.resize_px = resize_px
+        self.cache_images = cache_images
+        # DICOM decode dominates cost -- caching per study avoids re-decoding on every
+        # epoch. Only helps beyond one epoch if the DataLoader keeps worker processes
+        # alive across epochs (persistent_workers=True when num_workers>0); PyTorch
+        # respawns workers every epoch by default, which would silently make an
+        # in-process cache useless.
+        self._cache: dict[str, tuple[np.ndarray, np.ndarray]] = {}
 
     def __len__(self) -> int:
         return len(self.study_ids)
 
-    def __getitem__(self, idx: int) -> dict:
-        study_id = self.study_ids[idx]
+    def _load_images_and_mask(self, study_id: str) -> tuple[np.ndarray, np.ndarray]:
+        if self.cache_images and study_id in self._cache:
+            return self._cache[study_id]
+
         series_rows = self.series_by_study.get(study_id, pd.DataFrame(columns=["slot"]))
 
         images = np.zeros((len(SERIES_SLOTS), self.resize_px, self.resize_px), dtype=np.float32)
@@ -68,6 +78,13 @@ class StudyDataset(Dataset):
                     mask[0] = 1.0
                     break
 
+        if self.cache_images:
+            self._cache[study_id] = (images, mask)
+        return images, mask
+
+    def __getitem__(self, idx: int) -> dict:
+        study_id = self.study_ids[idx]
+        images, mask = self._load_images_and_mask(study_id)
         images_3ch = np.repeat(images[:, np.newaxis, :, :], 3, axis=1)  # (S, 3, H, W)
 
         if study_id in self.targets.index:
