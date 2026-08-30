@@ -35,15 +35,25 @@ def list_page(headers: dict, page_token: str | None) -> dict:
         return json.loads(r.read().decode())
 
 
-def download_file(headers: dict, file_name: str, dest: Path) -> None:
+def download_file(headers: dict, file_name: str, dest: Path, max_retries: int = 6) -> None:
     # Nested paths need their slashes percent-encoded (%2F) -- the download endpoint's
     # routing 404s on a literal "/" even though the list endpoint returns plain names.
     encoded = urllib.parse.quote(file_name, safe="")
     url = f"https://www.kaggle.com/api/v1/competitions/data/download/{COMPETITION}/{encoded}"
-    req = urllib.request.Request(url, headers=headers)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with urllib.request.urlopen(req, timeout=60) as r, open(dest, "wb") as out:
-        out.write(r.read())
+    for attempt in range(max_retries):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=60) as r, open(dest, "wb") as out:
+                out.write(r.read())
+            return
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < max_retries - 1:
+                wait = 2**attempt  # 1, 2, 4, 8, 16, 32s
+                print(f"  429 rate limited, backing off {wait}s...", file=sys.stderr, flush=True)
+                time.sleep(wait)
+                continue
+            raise
 
 
 def main() -> None:
@@ -111,6 +121,7 @@ def main() -> None:
             continue
         download_file(headers, name, dest)
         total_bytes += dest.stat().st_size
+        time.sleep(0.1)  # small pacing delay to avoid re-triggering the rate limit
         if (i + 1) % 50 == 0:
             print(f"  downloaded {i+1}/{len(train_series_files)} files "
                   f"({total_bytes / 1024**2:.0f} MB)", file=sys.stderr, flush=True)
