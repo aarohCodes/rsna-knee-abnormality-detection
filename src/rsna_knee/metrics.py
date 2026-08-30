@@ -65,3 +65,41 @@ def macro_auc(
     if not values:
         return float("nan")
     return float(np.mean(values))
+
+
+def rank_average(predictions: list[pd.DataFrame], label_columns: list[str] = LABEL_COLUMNS) -> pd.DataFrame:
+    """Combine multiple models' (or TTA passes') predictions by averaging per-label
+    ranks rather than raw probabilities or logits.
+
+    AUC only reads the relative order of predictions within a label, so it's invariant
+    to any strictly increasing transform of a single model's scores -- but averaging
+    raw probabilities across *different* models lets whichever one is most confident
+    (e.g. produces more extreme values) dominate the combination. Averaging ranks
+    combines exactly the information the metric uses, from every member equally.
+
+    All frames must share the same `StudyInstanceUID` values (though not necessarily
+    the same row order). Returns ranks normalized to (0, 1) so the output stays
+    interpretable as a probability-like score for writing a submission file.
+    """
+    if not predictions:
+        raise ValueError("rank_average requires at least one prediction frame")
+
+    aligned = [df.set_index("StudyInstanceUID") for df in predictions]
+    study_ids = aligned[0].index
+    for df in aligned[1:]:
+        if set(df.index) != set(study_ids):
+            raise ValueError("All prediction frames must cover the same StudyInstanceUID set")
+
+    n = len(study_ids)
+    rank_sum = pd.DataFrame(0.0, index=study_ids, columns=label_columns)
+    for df in aligned:
+        df = df.loc[study_ids]
+        # average=True ties get the mean rank, standard for rank-based combination
+        ranks = df[label_columns].rank(method="average")
+        rank_sum += ranks
+
+    averaged_rank = rank_sum / len(aligned)
+    normalized = (averaged_rank - 1) / max(n - 1, 1)  # map [1, n] -> [0, 1]
+
+    out = normalized.reset_index()
+    return out[["StudyInstanceUID", *label_columns]]
