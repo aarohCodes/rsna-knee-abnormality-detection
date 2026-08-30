@@ -169,9 +169,14 @@ holdout_predictions = run_inference(
 holdout_predictions = holdout_predictions.set_index('StudyInstanceUID')
 
 # Tier 1: silver-label holdout -- noisy but plenty of samples per class, drives
-# model/epoch selection.
+# model/epoch selection. Silver targets are graded/continuous scores, not binary --
+# sklearn's roc_auc_score requires discrete ground truth, so binarize at the
+# midpoint first (same approach as the public baseline notebook: "the graded
+# targets are binarised at their midpoint so that a held-out AUC can be computed
+# at all"). This is purely for computing a local diagnostic AUC -- the actual
+# training targets/weights (in `targets`) stay graded and untouched.
 holdout_silver_targets = targets[targets['StudyInstanceUID'].isin(holdout_ids)].set_index('StudyInstanceUID')
-y_true_silver = holdout_silver_targets.loc[holdout_predictions.index, LABEL_COLUMNS]
+y_true_silver = (holdout_silver_targets.loc[holdout_predictions.index, LABEL_COLUMNS] >= 0.5).astype(float)
 silver_scores = per_label_auc(y_true_silver.reset_index(drop=True), holdout_predictions.reset_index(drop=True))
 print('Holdout AUC vs SILVER labels (tier 1, primary signal):')
 for col, v in silver_scores.items():
