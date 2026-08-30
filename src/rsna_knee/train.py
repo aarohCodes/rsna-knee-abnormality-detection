@@ -19,7 +19,6 @@ from rsna_knee.data.labels import load_train_labels
 from rsna_knee.data.series import assign_slots
 from rsna_knee.datasets import StudyDataset
 from rsna_knee.models.vision import KneeMultiLabelModel
-from rsna_knee.validate import make_grouped_multilabel_folds, report_hash
 
 
 def weighted_bce_loss(logits: torch.Tensor, target: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
@@ -68,7 +67,6 @@ def build_datasets(data_root: Path, series_root: Path, study_ids: list[str] | No
     series_subset = series_df[series_df["StudyInstanceUID"].isin(study_ids)]
     series_with_slots = assign_slots(series_subset, series_root)
 
-    train_labels["report_hash"] = train_labels["Report"].map(report_hash)
     return train_labels, series_with_slots, targets, study_ids
 
 
