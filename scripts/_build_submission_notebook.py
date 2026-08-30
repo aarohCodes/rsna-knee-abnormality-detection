@@ -85,11 +85,14 @@ def select_device():
 device = select_device()
 print('device:', device)
 """,
-    # Cell 3: load + subset training data (v0: keep it fast, not exhaustive)
+    # Cell 3: load + subset training data
     """
-N_TRAIN_STUDIES_V0 = 800  # v0: fast correctness-check run, not full-scale training
-BATCH_SIZE = 8
-EPOCHS = 2
+# v0 (800 studies, CPU/T4) validated the pipeline end-to-end. v1: full training set
+# now that a T4 GPU is confirmed working and fast (v0 on T4: ~20.5 min total, vs
+# 1hr+ on CPU-only fallback).
+N_TRAIN_STUDIES_V0 = 4407
+BATCH_SIZE = 16
+EPOCHS = 3
 
 train_labels = load_train_labels(COMPETITION_ROOT / 'train.csv')
 train_series_csv = pd.read_csv(COMPETITION_ROOT / 'train_series.csv')

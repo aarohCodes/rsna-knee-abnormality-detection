@@ -5,6 +5,7 @@ Ties together series-slot assignment (data/series.py), representative-image load
 """
 from __future__ import annotations
 
+from collections import OrderedDict
 from pathlib import Path
 
 import numpy as np
@@ -15,6 +16,14 @@ from torch.utils.data import Dataset
 from rsna_knee.data.dicom_io import SERIES_SLOTS, load_series_representative
 from rsna_knee.data.preprocess import DEFAULT_PHYSICAL_CROP_MM, DEFAULT_RESIZE_PX
 from rsna_knee.metrics import LABEL_COLUMNS
+
+# Each cached study is len(SERIES_SLOTS) * resize_px^2 float32 -- at the default 336px,
+# ~2.7MB/study. With num_workers>0 each worker process holds its own independent
+# cache, and shuffling can scatter a given study across different workers on
+# different epochs, so per-worker memory isn't naturally bounded by "one copy of the
+# dataset" -- it can approach (num_workers * full dataset) in the worst case. Capping
+# per-worker cache size keeps memory bounded regardless of worker count or dataset size.
+DEFAULT_MAX_CACHE_STUDIES = 1500
 
 
 class StudyDataset(Dataset):
@@ -27,6 +36,7 @@ class StudyDataset(Dataset):
         physical_crop_mm: float = DEFAULT_PHYSICAL_CROP_MM,
         resize_px: int = DEFAULT_RESIZE_PX,
         cache_images: bool = True,
+        max_cache_studies: int = DEFAULT_MAX_CACHE_STUDIES,
     ):
         self.study_ids = list(study_ids)
         self.series_by_study = {
@@ -37,18 +47,21 @@ class StudyDataset(Dataset):
         self.physical_crop_mm = physical_crop_mm
         self.resize_px = resize_px
         self.cache_images = cache_images
+        self.max_cache_studies = max_cache_studies
         # DICOM decode dominates cost -- caching per study avoids re-decoding on every
         # epoch. Only helps beyond one epoch if the DataLoader keeps worker processes
         # alive across epochs (persistent_workers=True when num_workers>0); PyTorch
         # respawns workers every epoch by default, which would silently make an
-        # in-process cache useless.
-        self._cache: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        # in-process cache useless. Bounded LRU (see DEFAULT_MAX_CACHE_STUDIES above)
+        # rather than an unbounded dict, to keep per-worker memory predictable.
+        self._cache: OrderedDict[str, tuple[np.ndarray, np.ndarray]] = OrderedDict()
 
     def __len__(self) -> int:
         return len(self.study_ids)
 
     def _load_images_and_mask(self, study_id: str) -> tuple[np.ndarray, np.ndarray]:
         if self.cache_images and study_id in self._cache:
+            self._cache.move_to_end(study_id)
             return self._cache[study_id]
 
         series_rows = self.series_by_study.get(study_id, pd.DataFrame(columns=["slot"]))
@@ -80,6 +93,8 @@ class StudyDataset(Dataset):
 
         if self.cache_images:
             self._cache[study_id] = (images, mask)
+            if len(self._cache) > self.max_cache_studies:
+                self._cache.popitem(last=False)  # evict least-recently-used
         return images, mask
 
     def __getitem__(self, idx: int) -> dict:
