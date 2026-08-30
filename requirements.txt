@@ -5,7 +5,6 @@ scikit-learn
 scipy
 torch
 timm
-iterstrat
 pydicom
 pylibjpeg
 pylibjpeg-libjpeg

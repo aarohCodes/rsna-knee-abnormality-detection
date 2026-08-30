@@ -18,8 +18,8 @@ import hashlib
 
 import numpy as np
 import pandas as pd
-from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
 
+from rsna_knee._vendor.iterstrat.ml_stratifiers import MultilabelStratifiedKFold
 from rsna_knee.metrics import LABEL_COLUMNS
 
 
