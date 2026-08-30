@@ -24,11 +24,15 @@ OUT_DIR = Path('/kaggle/working')
 print('Contents of /kaggle/input:', sorted(p.name for p in INPUT_ROOT.iterdir()))
 
 
-def find_dir_containing(marker_relpath, root=INPUT_ROOT, max_depth=4):
+def find_dir_containing(marker_relpath, root=INPUT_ROOT, max_depth=8):
     \"\"\"Search /kaggle/input at increasing depth for a directory containing
-    `marker_relpath`, instead of assuming a fixed mount layout -- Kaggle's actual
-    layout here is /kaggle/input/{competitions,datasets}/..., not a flat
-    /kaggle/input/<slug>/ as commonly assumed.\"\"\"
+    `marker_relpath`, instead of assuming a fixed mount layout. Confirmed
+    inconsistent across source types: competitions nest under 'competitions/<slug>/',
+    some datasets mount flat at the top level (e.g. 'rsna-knee-llm-report-labels'),
+    others nest under 'datasets/<owner>/<name>/', and Model sources nest deepest
+    ('models/<owner>/<model>/<framework>/<variation>/<version>/...', depth 5-6).
+    max_depth=8 covers all of these with margin rather than guessing the exact
+    pattern for each source type.\"\"\"
     for depth in range(max_depth + 1):
         candidates = [root] if depth == 0 else root.glob('/'.join(['*'] * depth))
         for candidate in candidates:
