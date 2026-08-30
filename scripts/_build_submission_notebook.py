@@ -1,11 +1,13 @@
 """Generate submission/submission_kernel.ipynb.
 
-v0 goal (per PLAN.md step 7): a deliberately simple, fast, internet-off, GPU kernel
-that trains briefly on a subset of the full mounted training data and produces a
-valid submission.csv -- validating the whole Kaggle pipeline (package import, data
-mount paths, kernel constraints, submission format) before investing in a longer,
-higher-quality training run. pretrained=False throughout so no model-weight download
-is needed (internet is disabled during the scored run).
+v0 (validated on Kaggle: random-init ResNet18, 800 then full studies, no held-out
+eval) proved the pipeline works end-to-end -- public scores 0.596/0.617. v2 swaps in
+the real architecture: pretrained DINOv2 backbone (via a Kaggle Model source, no
+internet needed), discriminative fine-tuning (only the last 2 of 12 blocks unfrozen,
+separate encoder/head learning rates), the better-validated silver-label source, and
+a real held-out split so we can see per-label AUC instead of only training loss.
+TTA is deliberately left for a follow-up push -- too many new pieces to validate in
+one untested-on-Kaggle run already.
 """
 import json
 from pathlib import Path
@@ -47,6 +49,11 @@ COMPETITION_ROOT = find_dir_containing('sample_submission.csv')
 print('Resolved COMPETITION_ROOT:', COMPETITION_ROOT)
 print('Its contents:', sorted(p.name for p in COMPETITION_ROOT.iterdir()))
 
+# preprocessor_config.json is specific to HuggingFace vision-model checkpoints (e.g.
+# the mounted DINOv2 Model source) -- unambiguous among our attached inputs.
+DINOV2_PATH = find_dir_containing('preprocessor_config.json')
+print('Resolved DINOV2_PATH:', DINOV2_PATH)
+
 # Write a trivial valid submission first -- if anything below fails partway, this
 # is what gets scored instead of nothing.
 shutil.copy(COMPETITION_ROOT / 'sample_submission.csv', OUT_DIR / 'submission.csv')
@@ -54,16 +61,19 @@ print('Trivial fallback submission written.')
 """,
     # Cell 2: imports
     """
+import numpy as np
 import pandas as pd
 import torch
 
 from rsna_knee.data.series import assign_slots
-from rsna_knee.data.label_expansion import build_training_targets
+from rsna_knee.data.label_expansion import add_derived_confidence, build_training_targets
 from rsna_knee.data.labels import load_train_labels
 from rsna_knee.datasets import StudyDataset
+from rsna_knee.metrics import LABEL_COLUMNS, per_label_auc
 from rsna_knee.models.vision import KneeMultiLabelModel
 from rsna_knee.train import train_one_epoch
 from rsna_knee.infer import run_inference
+from rsna_knee.validate import report_hash, select_holdout_ids
 
 def select_device():
     \"\"\"torch.cuda.is_available() only checks that a CUDA driver/device is visible,
@@ -85,41 +95,37 @@ def select_device():
 device = select_device()
 print('device:', device)
 """,
-    # Cell 3: load + subset training data
+    # Cell 3: load data, build silver-expanded targets, split train/holdout
     """
-# v0 (800 studies, CPU/T4) validated the pipeline end-to-end. v1: full training set
-# now that a T4 GPU is confirmed working and fast (v0 on T4: ~20.5 min total, vs
-# 1hr+ on CPU-only fallback).
-N_TRAIN_STUDIES_V0 = 4407
 BATCH_SIZE = 16
 EPOCHS = 3
+N_UNFROZEN_BLOCKS = 2
+ENCODER_LR = 1e-5
+HEAD_LR = 1e-3
 
 train_labels = load_train_labels(COMPETITION_ROOT / 'train.csv')
 train_series_csv = pd.read_csv(COMPETITION_ROOT / 'train_series.csv')
 
-# Silver labels: LLM-derived report labels, attached as a second input dataset
-# (pilkwang/rsna-knee-llm-labels, CC0). Auto-discover its mount path the same way
-# as COMPETITION_ROOT, rather than assuming a fixed mount layout.
-SILVER_ROOT = find_dir_containing('report_labels_v2.csv')
-silver = pd.read_csv(SILVER_ROOT / 'report_labels_v2.csv')
+# Silver labels: stevenleehans/rsna-knee-llm-report-labels (llm_labels_v4_blend.csv),
+# validated against the 58 gold studies at 0.893 macro AUC -- better than, and not
+# leaked unlike some other public candidates (see label_expansion.py docstring for
+# the leakage check). No native confidence column, so derive one.
+SILVER_ROOT = find_dir_containing('llm_labels_v4_blend.csv')
+silver = pd.read_csv(SILVER_ROOT / 'llm_labels_v4_blend.csv')
+silver = add_derived_confidence(silver)
 targets = build_training_targets(train_labels, silver)
 
-# v0 subset: prioritize the 58 gold-labeled studies (small but high-value), fill the
-# rest randomly up to the budget.
-gold_ids = train_labels.loc[
-    train_labels[[c for c in train_labels.columns if c not in ('StudyInstanceUID', 'Report')]].notna().any(axis=1),
-    'StudyInstanceUID',
-].tolist()
-rest = train_labels.loc[~train_labels['StudyInstanceUID'].isin(gold_ids), 'StudyInstanceUID']
-rest_sample = rest.sample(n=min(N_TRAIN_STUDIES_V0 - len(gold_ids), len(rest)), random_state=42).tolist()
-study_ids = gold_ids + rest_sample
-print(f'v0 training subset: {len(study_ids)} studies ({len(gold_ids)} gold)')
+train_labels['report_hash'] = train_labels['Report'].map(report_hash)
+train_ids, holdout_ids = select_holdout_ids(
+    train_labels, group_col='report_hash', n_splits=5, seed=42, holdout_fold=0
+)
+print(f'train: {len(train_ids)} studies, holdout: {len(holdout_ids)} studies')
 
 train_series_dir = COMPETITION_ROOT / 'train_series'
-series_subset = train_series_csv[train_series_csv['StudyInstanceUID'].isin(study_ids)]
-series_with_slots = assign_slots(series_subset, train_series_dir)
+train_series_subset = train_series_csv[train_series_csv['StudyInstanceUID'].isin(train_ids)]
+train_series_with_slots = assign_slots(train_series_subset, train_series_dir)
 
-train_dataset = StudyDataset(study_ids, series_with_slots, train_series_dir, targets)
+train_dataset = StudyDataset(train_ids, train_series_with_slots, train_series_dir, targets)
 # persistent_workers=True is required for the dataset's per-study image cache to help
 # beyond the first epoch -- PyTorch respawns worker processes every epoch by default,
 # which would otherwise silently discard each worker's in-process cache every time.
@@ -128,21 +134,64 @@ train_loader = torch.utils.data.DataLoader(
 )
 print('train dataset size:', len(train_dataset))
 """,
-    # Cell 4: train
+    # Cell 4: train -- pretrained DINOv2 backbone, discriminative fine-tuning
     """
 model = KneeMultiLabelModel(
-    num_slots=6, num_labels=12, backbone_name='resnet18', pretrained=False
+    num_slots=6, num_labels=12, hf_pretrained_path=str(DINOV2_PATH)
 ).to(device)
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+model.encoder.freeze_except_last_n_blocks(N_UNFROZEN_BLOCKS)
+
+n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+n_total = sum(p.numel() for p in model.parameters())
+print(f'trainable params: {n_trainable:,} / {n_total:,} ({100*n_trainable/n_total:.1f}%)')
+
+optimizer = torch.optim.AdamW(model.discriminative_param_groups(ENCODER_LR, HEAD_LR))
 
 for epoch in range(EPOCHS):
     loss = train_one_epoch(model, train_loader, optimizer, device)
     print(f'epoch {epoch+1}/{EPOCHS}: loss={loss:.4f}')
 
-torch.save(model.state_dict(), OUT_DIR / 'model_v0.pt')
+torch.save(model.state_dict(), OUT_DIR / 'model_v2.pt')
 print('Checkpoint saved.')
 """,
-    # Cell 5: inference on the real test set + overwrite the trivial submission
+    # Cell 5: two-tier holdout evaluation (per PLAN.md's baseline-notebook design)
+    """
+holdout_series_subset = train_series_csv[train_series_csv['StudyInstanceUID'].isin(holdout_ids)]
+holdout_series_with_slots = assign_slots(holdout_series_subset, train_series_dir)
+
+holdout_predictions = run_inference(
+    model, holdout_ids, holdout_series_with_slots, train_series_dir, device, batch_size=BATCH_SIZE
+)
+holdout_predictions = holdout_predictions.set_index('StudyInstanceUID')
+
+# Tier 1: silver-label holdout -- noisy but plenty of samples per class, drives
+# model/epoch selection.
+holdout_silver_targets = targets[targets['StudyInstanceUID'].isin(holdout_ids)].set_index('StudyInstanceUID')
+y_true_silver = holdout_silver_targets.loc[holdout_predictions.index, LABEL_COLUMNS]
+silver_scores = per_label_auc(y_true_silver.reset_index(drop=True), holdout_predictions.reset_index(drop=True))
+print('Holdout AUC vs SILVER labels (tier 1, primary signal):')
+for col, v in silver_scores.items():
+    print(f'  {col:20s} {v:.3f}' if not np.isnan(v) else f'  {col:20s} n/a')
+silver_vals = [v for v in silver_scores.values() if not np.isnan(v)]
+print(f'  MACRO: {np.mean(silver_vals):.4f}' if silver_vals else '  MACRO: n/a')
+
+# Tier 2: the gold-labeled studies that landed in this holdout -- approximates the
+# real competition metric but too few samples to arbitrate alone; report only.
+holdout_gold_mask = train_labels.set_index('StudyInstanceUID').loc[holdout_ids, LABEL_COLUMNS].notna().any(axis=1)
+holdout_gold_ids = [sid for sid in holdout_ids if holdout_gold_mask.get(sid, False)]
+print(f'\\nHoldout AUC vs GOLD labels (tier 2, annotation check, n={len(holdout_gold_ids)}):')
+if len(holdout_gold_ids) >= 5:
+    gold_true = train_labels.set_index('StudyInstanceUID').loc[holdout_gold_ids, LABEL_COLUMNS]
+    gold_pred = holdout_predictions.loc[holdout_gold_ids, LABEL_COLUMNS]
+    gold_scores = per_label_auc(gold_true.reset_index(drop=True), gold_pred.reset_index(drop=True))
+    for col, v in gold_scores.items():
+        print(f'  {col:20s} {v:.3f}' if not np.isnan(v) else f'  {col:20s} n/a')
+    gold_vals = [v for v in gold_scores.values() if not np.isnan(v)]
+    print(f'  MACRO: {np.mean(gold_vals):.4f}' if gold_vals else '  MACRO: n/a')
+else:
+    print('  too few gold studies in this holdout to report per-label AUC')
+""",
+    # Cell 6: inference on the real test set + overwrite the trivial submission
     """
 test_csv = pd.read_csv(COMPETITION_ROOT / 'test.csv')
 test_series_csv = pd.read_csv(COMPETITION_ROOT / 'test_series.csv')
