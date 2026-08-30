@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from rsna_knee.metrics import LABEL_COLUMNS
-from rsna_knee.validate import make_grouped_multilabel_folds, report_hash
+from rsna_knee.validate import make_grouped_multilabel_folds, report_hash, select_holdout_ids
 
 
 def test_report_hash_stable_and_normalizes_whitespace_and_case():
@@ -60,3 +60,36 @@ def test_folds_are_roughly_balanced_in_size():
     # with mostly-unique groups and 5 folds, no fold should be wildly off from 500/5=100
     assert counts.min() > 60
     assert counts.max() < 140
+
+
+def test_select_holdout_ids_partitions_without_overlap_or_gaps():
+    df = _synthetic_df(n=300)
+    train_ids, holdout_ids = select_holdout_ids(df, group_col="report_hash", n_splits=5, seed=0)
+
+    assert set(train_ids).isdisjoint(set(holdout_ids))
+    assert set(train_ids) | set(holdout_ids) == set(df["StudyInstanceUID"])
+    assert len(train_ids) + len(holdout_ids) == len(df)
+
+
+def test_select_holdout_ids_roughly_one_fifth_for_five_splits():
+    df = _synthetic_df(n=500, n_duplicate_groups=5)
+    train_ids, holdout_ids = select_holdout_ids(df, group_col="report_hash", n_splits=5, seed=0)
+    # ~20% holdout, generous tolerance given group-based (not row-based) splitting
+    assert 60 < len(holdout_ids) < 140
+
+
+def test_select_holdout_ids_different_fold_gives_different_holdout():
+    df = _synthetic_df(n=300)
+    _, holdout_0 = select_holdout_ids(df, group_col="report_hash", n_splits=5, seed=0, holdout_fold=0)
+    _, holdout_1 = select_holdout_ids(df, group_col="report_hash", n_splits=5, seed=0, holdout_fold=1)
+    assert set(holdout_0) != set(holdout_1)
+
+
+def test_select_holdout_ids_keeps_duplicate_report_groups_together():
+    df = _synthetic_df(n=300)
+    _, holdout_ids = select_holdout_ids(df, group_col="report_hash", n_splits=5, seed=0)
+    holdout_set = set(holdout_ids)
+    for _, group_df in df.groupby("report_hash"):
+        ids_in_group = set(group_df["StudyInstanceUID"])
+        # a duplicate-report group must be entirely in or entirely out of the holdout
+        assert ids_in_group.issubset(holdout_set) or ids_in_group.isdisjoint(holdout_set)

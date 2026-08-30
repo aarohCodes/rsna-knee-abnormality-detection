@@ -64,3 +64,27 @@ def make_grouped_multilabel_folds(
             group_fold[g] = fold
 
     return df[group_col].map(group_fold)
+
+
+def select_holdout_ids(
+    df: pd.DataFrame,
+    group_col: str,
+    study_col: str = "StudyInstanceUID",
+    label_columns: list[str] = LABEL_COLUMNS,
+    n_splits: int = 5,
+    seed: int = 42,
+    holdout_fold: int = 0,
+) -> tuple[list[str], list[str]]:
+    """Split `df`'s studies into (train_ids, holdout_ids) using one fold of
+    `make_grouped_multilabel_folds` as the holdout. Intended for the baseline
+    notebook's two-tier validation design (see PLAN.md): a ~20% holdout drives model
+    selection using derived/silver labels (plenty of samples per class), while a much
+    smaller "annotation check" -- the gold-labeled studies that land in that holdout
+    -- approximates the actual competition metric closely enough to report, without
+    enough samples to arbitrate alone.
+    """
+    folds = make_grouped_multilabel_folds(df, group_col, label_columns, n_splits, seed)
+    is_holdout = folds == holdout_fold
+    holdout_ids = df.loc[is_holdout, study_col].tolist()
+    train_ids = df.loc[~is_holdout, study_col].tolist()
+    return train_ids, holdout_ids
