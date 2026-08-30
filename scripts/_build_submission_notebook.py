@@ -16,29 +16,34 @@ CODE_CELLS = [
 import sys, shutil
 from pathlib import Path
 
-SRC_DATASET = Path('/kaggle/input/rsna-knee-src')
-sys.path.insert(0, str(SRC_DATASET))
-
 INPUT_ROOT = Path('/kaggle/input')
 OUT_DIR = Path('/kaggle/working')
 
 print('Contents of /kaggle/input:', sorted(p.name for p in INPUT_ROOT.iterdir()))
 
-# Don't hardcode the competition mount path -- find whichever /kaggle/input/*
-# directory actually contains sample_submission.csv, since the exact slug/mount
-# naming isn't guaranteed to match the competition's URL slug.
-candidates = [p for p in INPUT_ROOT.iterdir() if (p / 'sample_submission.csv').exists()]
-if not candidates:
-    # maybe nested one level deeper
-    candidates = [
-        p for p in INPUT_ROOT.glob('*/*') if p.is_dir() and (p / 'sample_submission.csv').exists()
-    ]
-if not candidates:
+
+def find_dir_containing(marker_relpath, root=INPUT_ROOT, max_depth=4):
+    \"\"\"Search /kaggle/input at increasing depth for a directory containing
+    `marker_relpath`, instead of assuming a fixed mount layout -- Kaggle's actual
+    layout here is /kaggle/input/{competitions,datasets}/..., not a flat
+    /kaggle/input/<slug>/ as commonly assumed.\"\"\"
+    for depth in range(max_depth + 1):
+        pattern = '/'.join(['*'] * depth) if depth else '.'
+        for candidate in root.glob(pattern):
+            if candidate.is_dir() and (candidate / marker_relpath).exists():
+                return candidate
     raise FileNotFoundError(
-        f'Could not find sample_submission.csv under any /kaggle/input subdirectory. '
-        f'Top-level contents: {sorted(p.name for p in INPUT_ROOT.iterdir())}'
+        f'Could not find a directory containing {marker_relpath!r} under {root} '
+        f'(searched up to depth {max_depth}). Top-level contents: '
+        f'{sorted(p.name for p in root.iterdir())}'
     )
-COMPETITION_ROOT = candidates[0]
+
+
+SRC_DATASET = find_dir_containing('rsna_knee/__init__.py')
+print('Resolved SRC_DATASET:', SRC_DATASET)
+sys.path.insert(0, str(SRC_DATASET))
+
+COMPETITION_ROOT = find_dir_containing('sample_submission.csv')
 print('Resolved COMPETITION_ROOT:', COMPETITION_ROOT)
 print('Its contents:', sorted(p.name for p in COMPETITION_ROOT.iterdir()))
 
@@ -74,14 +79,9 @@ train_series_csv = pd.read_csv(COMPETITION_ROOT / 'train_series.csv')
 
 # Silver labels: LLM-derived report labels, attached as a second input dataset
 # (pilkwang/rsna-knee-llm-labels, CC0). Auto-discover its mount path the same way
-# as COMPETITION_ROOT, rather than assuming the mount folder matches the dataset slug.
-silver_candidates = list(INPUT_ROOT.glob('*/report_labels_v2.csv'))
-if not silver_candidates:
-    raise FileNotFoundError(
-        f'Could not find report_labels_v2.csv under any /kaggle/input subdirectory. '
-        f'Top-level contents: {sorted(p.name for p in INPUT_ROOT.iterdir())}'
-    )
-silver = pd.read_csv(silver_candidates[0])
+# as COMPETITION_ROOT, rather than assuming a fixed mount layout.
+SILVER_ROOT = find_dir_containing('report_labels_v2.csv')
+silver = pd.read_csv(SILVER_ROOT / 'report_labels_v2.csv')
 targets = build_training_targets(train_labels, silver)
 
 # v0 subset: prioritize the 58 gold-labeled studies (small but high-value), fill the
