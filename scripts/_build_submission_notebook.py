@@ -19,8 +19,28 @@ from pathlib import Path
 SRC_DATASET = Path('/kaggle/input/rsna-knee-src')
 sys.path.insert(0, str(SRC_DATASET))
 
-COMPETITION_ROOT = Path('/kaggle/input/rsna-knee-abnormality-detection')
+INPUT_ROOT = Path('/kaggle/input')
 OUT_DIR = Path('/kaggle/working')
+
+print('Contents of /kaggle/input:', sorted(p.name for p in INPUT_ROOT.iterdir()))
+
+# Don't hardcode the competition mount path -- find whichever /kaggle/input/*
+# directory actually contains sample_submission.csv, since the exact slug/mount
+# naming isn't guaranteed to match the competition's URL slug.
+candidates = [p for p in INPUT_ROOT.iterdir() if (p / 'sample_submission.csv').exists()]
+if not candidates:
+    # maybe nested one level deeper
+    candidates = [
+        p for p in INPUT_ROOT.glob('*/*') if p.is_dir() and (p / 'sample_submission.csv').exists()
+    ]
+if not candidates:
+    raise FileNotFoundError(
+        f'Could not find sample_submission.csv under any /kaggle/input subdirectory. '
+        f'Top-level contents: {sorted(p.name for p in INPUT_ROOT.iterdir())}'
+    )
+COMPETITION_ROOT = candidates[0]
+print('Resolved COMPETITION_ROOT:', COMPETITION_ROOT)
+print('Its contents:', sorted(p.name for p in COMPETITION_ROOT.iterdir()))
 
 # Write a trivial valid submission first -- if anything below fails partway, this
 # is what gets scored instead of nothing.
@@ -52,9 +72,16 @@ EPOCHS = 2
 train_labels = load_train_labels(COMPETITION_ROOT / 'train.csv')
 train_series_csv = pd.read_csv(COMPETITION_ROOT / 'train_series.csv')
 
-# Need a public silver-labels source too: LLM-derived report labels, attached as a
-# second input dataset (pilkwang/rsna-knee-llm-labels, CC0).
-silver = pd.read_csv('/kaggle/input/rsna-knee-llm-labels/report_labels_v2.csv')
+# Silver labels: LLM-derived report labels, attached as a second input dataset
+# (pilkwang/rsna-knee-llm-labels, CC0). Auto-discover its mount path the same way
+# as COMPETITION_ROOT, rather than assuming the mount folder matches the dataset slug.
+silver_candidates = list(INPUT_ROOT.glob('*/report_labels_v2.csv'))
+if not silver_candidates:
+    raise FileNotFoundError(
+        f'Could not find report_labels_v2.csv under any /kaggle/input subdirectory. '
+        f'Top-level contents: {sorted(p.name for p in INPUT_ROOT.iterdir())}'
+    )
+silver = pd.read_csv(silver_candidates[0])
 targets = build_training_targets(train_labels, silver)
 
 # v0 subset: prioritize the 58 gold-labeled studies (small but high-value), fill the
