@@ -65,7 +65,24 @@ from rsna_knee.models.vision import KneeMultiLabelModel
 from rsna_knee.train import train_one_epoch
 from rsna_knee.infer import run_inference
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+def select_device():
+    \"\"\"torch.cuda.is_available() only checks that a CUDA driver/device is visible,
+    not that the installed PyTorch build actually supports its compute capability --
+    Kaggle sometimes assigns an older GPU (e.g. a P100, sm_60) that a newer PyTorch
+    wheel has dropped kernel support for, which fails on the first real op rather
+    than at is_available() time. Do a tiny real op and fall back to CPU if it fails.
+    \"\"\"
+    if not torch.cuda.is_available():
+        return 'cpu'
+    try:
+        (torch.zeros(1, device='cuda') + 1).cpu()
+        return 'cuda'
+    except Exception as e:
+        print(f'CUDA reported available but failed a sanity op ({e!r}); falling back to CPU.')
+        return 'cpu'
+
+
+device = select_device()
 print('device:', device)
 """,
     # Cell 3: load + subset training data (v0: keep it fast, not exhaustive)
