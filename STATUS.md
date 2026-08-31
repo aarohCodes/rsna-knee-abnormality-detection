@@ -93,7 +93,8 @@ weights dataset (do that before any further continue-training off of it).
   `kaggle_dataset_src/` + `datasets version` after any src change --
   **easy to forget, causes ImportError on next kernel push**),
   `rsna-knee-weights-v13` (small, 3ep), `rsna-knee-weights-v3` (small, 6ep),
-  `rsna-knee-weights-v4` (small, 9ep), `rsna-knee-weights-base-v1` (base, 3ep)
+  `rsna-knee-weights-v4` (small, 9ep), `rsna-knee-weights-base-v1` (base, 3ep),
+  `rsna-knee-weights-base-v2` (base, 6ep, tier1=0.7931, uploaded)
 - **Kernels** (each has its own folder + `scripts/_build_*_notebook.py` generator --
   edit the generator, run it, then `kaggle kernels push -p <folder>`):
   - `submission/` -> `rsna-knee-submission-v0`: original v0/v13 combined train+infer
@@ -147,9 +148,8 @@ submit -- waiting on the user to open
 https://www.kaggle.com/code/aarohnanoti/rsna-knee-base-continue and click
 "Submit to Competition" (I have no API access to do this). 5/5 daily
 submissions available (cap reset at 2026-08-31 00:00 UTC, all prior 5 used
-on 2026-08-30 UTC). `model_base_v2.pt` still needs re-uploading as a
-`rsna-knee-weights-base-v2` Kaggle dataset before any further continue-
-training off of it (currently only sits in `data/interim/kernel_output_base_continue_v1/`).
+on 2026-08-30 UTC). `model_base_v2.pt` has been uploaded as the `rsna-knee-weights-base-v2`
+Kaggle dataset, ready to use as a resume point for further continue-training.
 
 ## Submission mechanics reminder
 I can push/run kernels via the Kaggle API, but **clicking "Submit to Competition"
