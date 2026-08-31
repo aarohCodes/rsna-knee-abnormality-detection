@@ -5,11 +5,14 @@ Full strategy/reasoning is in PLAN.md; this file is the living "where are we now
 
 ## ACTIVE BLOCKER: Kaggle weekly GPU quota exhausted (30h/week)
 As of 2026-08-31, `kernels push` for a GPU kernel fails with "Maximum weekly GPU
-quota of 30.00 hours reached." No GPU kernels can run until this resets -- exact
-reset time unknown, check the Kaggle notebook editor's session panel for the real
-countdown rather than guessing. **CPU-only kernels (`enable_gpu: false`) are
-unaffected** -- confirmed working today (slot-coverage and slice-count diagnostics
-both ran fine under this same quota exhaustion). Base v2 (real score 0.812) is our
+quota of 30.00 hours reached." No GPU kernels can run until this resets.
+**Confirmed exact reset time via `kaggle quota` (a real CLI command, discovered
+2026-08-31 -- use this directly instead of guessing or asking the user to check
+manually next time): GPU refreshAt = 2026-09-05T00:00:00.** TPU quota is
+completely unused (20h available) if ever worth targeting. **CPU-only kernels
+(`enable_gpu: false`) are unaffected** -- confirmed working today (slot-coverage
+and slice-count diagnostics both ran fine under this same quota exhaustion).
+Base v2 (real score 0.812) is our
 best checkpoint and is already submitted -- nothing is at risk, GPU-dependent work
 is just paused until quota resets. See roadmap item 6 for the queued next GPU run.
 
@@ -370,16 +373,16 @@ didn't. Not yet submitted to competition -- ready to.
    multislice-fresh` was scoped (K=3 FRESH from pretrained DINOv2-base,
    6 epochs matching v2's own budget) but `kernels push` failed with
    "Maximum weekly GPU quota of 30.00 hours reached" -- **no more GPU
-   kernels can run until Kaggle's weekly quota resets.** Exact reset
-   time unknown (check the Kaggle notebook editor's session panel for the
-   real countdown -- don't guess/assert a specific time without checking
-   there first). CPU-only kernels are UNAFFECTED (confirmed: both
-   diagnostic kernels today, slot-coverage and slice-count, ran fine and
-   didn't count against this cap) -- any further data-analysis-only work
-   remains possible in the meantime. The notebook/kernel-metadata for
-   `submission_base_multislice_fresh` are built and committed, ready to
-   push the moment quota resets -- no rework needed, just re-run `kaggle
-   kernels push -p submission_base_multislice_fresh`.
+   kernels can run until Kaggle's weekly quota resets at
+   2026-09-05T00:00:00** (confirmed via `kaggle quota` -- see the
+   top-of-file ACTIVE BLOCKER note; use that command directly in future,
+   don't guess or ask the user to check manually). CPU-only kernels are
+   UNAFFECTED (confirmed: both diagnostic kernels today, slot-coverage and
+   slice-count, ran fine and didn't count against this cap) -- any further
+   data-analysis-only work remains possible in the meantime. The notebook/
+   kernel-metadata for `submission_base_multislice_fresh` are built and
+   committed, ready to push the moment quota resets -- no rework needed,
+   just re-run `kaggle kernels push -p submission_base_multislice_fresh`.
 
    This was estimated ~5h45m based on the first multi-slice run's
    per-epoch timing (6 x ~3040s + setup + eval), safely under the 9h cap.
