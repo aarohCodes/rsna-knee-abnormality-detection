@@ -333,17 +333,38 @@ didn't. Not yet submitted to competition -- ready to.
      currently a no-op when `slices_per_slot>1` -- use a single-pass config
      until/unless TTA is redesigned around multi-slice.
 
-   **First validation run, RUNNING**: `rsna-knee-base-multislice` --
-   resumes base v2 (real score 0.812, tier1=0.7931) with
-   `slices_per_slot=3` (start/middle/end of each series, not just center),
-   BATCH_SIZE cut 8->3 to compensate for ~3x more images/study, only 2
-   additional epochs (short, for a first viability check), N_UNFROZEN_BLOCKS
-   and LR unchanged from v2 (isolating K as the only new variable, same
-   single-variable-change discipline as the v3/lrdecay/unfreeze4
-   experiments). No TTA this round. Reference to beat: tier1=0.7931,
-   tier2=0.7774, real=0.812. Waiting on results -- runtime is the open
-   question (estimated ~3.5-4.5h based on rough K-scaling of observed
-   per-epoch times, should fit the 9h cap, but not yet confirmed for real).
+   **First validation run, RESULT: didn't beat v2, but confounded --
+   second, cleaner test approved and running.** `rsna-knee-base-multislice`
+   (resumed base v2, `slices_per_slot=3`, 2 additional epochs) scored
+   tier1=0.7793, tier2=0.7729 -- below v2 (0.7931/0.7774). Runtime was
+   2h24m total (epochs ~3040s each, holdout inference 2026s), comfortably
+   under the 9h cap -- that risk is resolved regardless of the accuracy
+   result.
+
+   **Important pattern**: this is now the FIFTH attempt to beat v2 (slot
+   fallback, v3, lrdecay, unfreeze4, multislice) and all five land in a
+   tight tier1 band of 0.769-0.779, despite changing completely different
+   things (data content, LR, capacity, and now the input representation
+   itself). Only v2 stands out at 0.7931. Honest alternative reading worth
+   holding onto: v2's 0.7931 may be a favorable outlier in the noise rather
+   than a "true" target -- five independent methods clustering together is
+   data too, not just five failures.
+
+   **Confound specific to this run**: multi-slice was resumed from v2 for
+   only 2 epochs, the same short-resume pattern as the failed v3/lrdecay/
+   unfreeze4 attempts -- can't cleanly separate "multi-slice doesn't help"
+   from "2 epochs isn't enough exposure to a suddenly-richer input for a
+   model already converged on K=1." Not submitted (not better locally).
+
+   **Second, cleaner test APPROVED and RUNNING**: `rsna-knee-base-
+   multislice-fresh` -- trains multi-slice (K=3) FRESH from pretrained
+   DINOv2-base for a full 6 epochs, matching v2's own epoch budget exactly
+   (same pattern as the base-fallback experiment), instead of a short
+   resumed extension. Estimated ~5h45m based on this run's per-epoch
+   timing (6 x ~3040s + setup + eval), safely under the 9h cap. This is the
+   decisive test of whether multi-slice input helps at all, isolated from
+   the "any further training past v2 degrades" confound. Reference to
+   beat: v2's tier1=0.7931/real=0.812.
 
 Explicitly deferred / do not start without asking again: external MRI datasets
 (MRNet/OAI) and RadImageNet-style domain-specific pretrained backbones.
