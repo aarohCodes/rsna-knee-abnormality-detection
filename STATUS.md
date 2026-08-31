@@ -187,7 +187,39 @@ didn't. Not yet submitted to competition -- ready to.
    `rsna-knee-slot-coverage-diagnostic` (CPU-only, no GPU, no training --
    just reads one DICOM header per series across all 24,371 training series
    and tabulates slot coverage, cross-tabulated against MCL-positive vs
-   MCL-negative gold studies). Waiting on results.
+   MCL-negative gold studies).
+
+   **RESULTS: MCL's weakness is a real, systemic data-coverage gap.**
+   COR_T1 (the slot MCL is read off) is present in only 48.1% of ALL
+   training studies (2121/4407) and 51.7% of gold studies (30/58) -- roughly
+   half the corpus has no usable coronal T1 series at all. Critically, this
+   is NOT selective: MCL-positive gold studies have COR_T1 at 55.6% (5/9),
+   MCL-negative at 51.0% (25/49) -- essentially identical, so it's not that
+   positive cases are disproportionately missing the view. It's that the
+   whole dataset is close to a coin flip on whether the diagnostic sequence
+   for MCL exists at all, which drags down average performance across the
+   board. By contrast, Lateral Meniscus's slot (SAG_FLUID_FS) has strong
+   88.7% coverage -- so its weakness is more likely genuinely harder signal
+   (plausibly the well-known posterolateral popliteus-tendon-hiatus
+   mimicker that makes lateral meniscus reads inherently harder even for
+   human radiologists), not a data problem, and probably isn't fixable the
+   same way.
+
+   Full slot coverage (all 4407 studies): SAG_FLUID_FS 88.7%, COR_FLUID_FS
+   91.0%, AX_FLUID_FS 86.7%, SAG_FLUID_NOFS 46.2%, COR_T1 48.1%, SAG_T1
+   31.9%. The three FLUID_FS slots are consistently well-covered; the two
+   T1 slots and SAG_FLUID_NOFS are all in the 30-48% range -- this may
+   partly explain other mid-weak labels too (PF OA, Baker's) if they lean
+   on T1 views.
+
+   **Actionable fix identified, not yet implemented**: currently a missing
+   COR_T1 leaves that slot empty/masked rather than substituting the
+   next-best coronal series (COR_FLUID_FS, 91% coverage) -- so ~52% of
+   studies get zero coronal signal at all instead of a degraded-but-useful
+   one. A coronal fallback (use COR_FLUID_FS when COR_T1 is absent) is a
+   scoped, cheap change worth trying before/alongside item 6. Raw data:
+   `train_series_with_slots.csv` downloaded to
+   `data/interim/kernel_output_slot_coverage_v1/`.
 6. Multi-slice/volumetric input instead of one representative crop per series
 
 Explicitly deferred / do not start without asking again: external MRI datasets
