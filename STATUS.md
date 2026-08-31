@@ -219,21 +219,35 @@ didn't. Not yet submitted to competition -- ready to.
    partly explain other mid-weak labels too (PF OA, Baker's) if they lean
    on T1 views.
 
-   **Fix IMPLEMENTED and being tested.** Added `SLOT_FALLBACKS = {"COR_T1":
-   "COR_FLUID_FS"}` in `data/dicom_io.py`; `datasets.py`'s
-   `_load_images_and_mask` substitutes the fallback slot's series when a
-   study's own COR_T1 is absent (still masked=0 if neither is present).
-   Verified against real local DICOM data (not just mocks) -- a real study
-   missing COR_T1 now gets a real decoded image + mask=1 via the fallback.
-   3 new tests added, full suite 90/90 passing. Synced to `rsna-knee-src`
-   (remember `--dir-mode zip` or the folder silently gets skipped -- caught
-   this once already today).
+   **RESULT: the fallback made things WORSE, not better. Disabled by default.**
+   `rsna-knee-base-fallback` (fresh 6ep, fallback enabled) scored tier1=0.7791
+   (vs base v2's 0.7931 -- no fallback) and, critically, MCL itself got worse
+   too (0.641 vs 0.663), the opposite of the hypothesis. 9 of 12 labels
+   declined. Real caveat: this run trained 6 continuous epochs in one pass,
+   while base v2's 6 epochs happened as two 3-epoch stages with AdamW's
+   optimizer state reset in between (we only save/restore model weights, not
+   optimizer state) -- so the comparison isn't perfectly clean, some of the
+   gap could be training-trajectory variance rather than the fallback itself.
+   Leading hypothesis for a real causal effect: marking a substituted slot
+   `mask=1.0`, identical to a genuine one, gives the model no way to tell
+   real ligament-optimized T1 contrast from substituted fluid-sensitive
+   contrast at the same slot position -- adding noise rather than removing
+   a gap. **Made `use_slot_fallbacks` an opt-in StudyDataset parameter,
+   default `False`**, so this negative result can't silently regress the
+   known-good default pipeline (base v2, real score 0.812) if we retrain
+   further. `SLOT_FALLBACKS` and the substitution logic are kept in the
+   codebase (not deleted) in case a better-controlled retry is worth it
+   later (e.g. a distinct fallback indicator instead of mask=1.0), but
+   don't re-enable without a cleaner ablation. 4 tests now cover this
+   (3 fallback-behavior tests pass `use_slot_fallbacks=True` explicitly,
+   1 new test confirms the default stays off). Full suite: 91/91 passing.
+   Synced to `rsna-knee-src` (remember `--dir-mode zip`).
 
-   Pushed `rsna-knee-base-fallback`: trains FRESH from pretrained DINOv2-
-   base (not continued from v2, to avoid confounding with the overfitting-
-   at-9-epochs issue v3 already showed) for 6 epochs -- matching base v2's
-   epoch count for a clean, direct comparison. Reference to beat: base v2
-   tier1=0.7931 macro, MCL alone=0.663. Waiting on results.
+   Item 5 conclusion: MCL's weakness is real and explained (data coverage),
+   but the fix attempted didn't pan out. Don't revisit without either a
+   properly controlled ablation (same continuous-training methodology on
+   both sides) or a redesigned fallback that distinguishes substituted from
+   genuine content. Moving on to item 6.
    Raw slot-coverage data: `train_series_with_slots.csv` in
    `data/interim/kernel_output_slot_coverage_v1/`.
 6. Multi-slice/volumetric input instead of one representative crop per series

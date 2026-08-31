@@ -73,6 +73,7 @@ class StudyDataset(Dataset):
         cache_images: bool = True,
         max_cache_studies: int = DEFAULT_MAX_CACHE_STUDIES,
         center_fraction: float = 0.5,
+        use_slot_fallbacks: bool = False,
     ):
         self.study_ids = list(study_ids)
         self.series_by_study = {
@@ -84,6 +85,17 @@ class StudyDataset(Dataset):
         self.resize_px = resize_px
         self.cache_images = cache_images
         self.max_cache_studies = max_cache_studies
+        # Off by default: a controlled test (rsna-knee-base-fallback, see STATUS.md
+        # roadmap item 5) found this made results WORSE, not better -- tier1 macro
+        # 0.7931->0.7791 and MCL itself 0.663->0.641, despite the data-coverage
+        # rationale seeming sound. Leading hypothesis: marking a substituted slot
+        # mask=1.0 identically to a genuine one gives the model no way to distinguish
+        # real ligament-optimized T1 contrast from substituted fluid-sensitive
+        # contrast at the same slot position, adding noise rather than removing a
+        # gap. Kept available (not deleted) for a future, better-controlled retry
+        # (e.g. a distinct fallback indicator) but must not silently affect the
+        # known-good default pipeline used by our current best checkpoint (base v2).
+        self.use_slot_fallbacks = use_slot_fallbacks
         # Which slice-window to sample per series (0.5 = middle, the default). TTA
         # varies this across several StudyDataset instances at inference time and
         # combines their predictions -- see infer.run_inference_tta.
@@ -111,7 +123,7 @@ class StudyDataset(Dataset):
 
         for slot_idx, slot in enumerate(SERIES_SLOTS):
             matches = series_rows[series_rows["slot"] == slot]
-            if matches.empty and slot in SLOT_FALLBACKS:
+            if matches.empty and self.use_slot_fallbacks and slot in SLOT_FALLBACKS:
                 # See SLOT_FALLBACKS' docstring: COR_T1 is missing in ~52% of studies,
                 # non-selectively, so substituting the next-best coronal view beats
                 # leaving this slot position all-zero/masked-out. If the fallback slot

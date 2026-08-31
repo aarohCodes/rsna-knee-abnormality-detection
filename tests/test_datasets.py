@@ -230,13 +230,34 @@ def _multi_slot_series(study_id: str, slots: list[str]):
     )
 
 
+def test_slot_fallback_disabled_by_default():
+    study_id = "study_1"
+    # A controlled test found the fallback made results worse, not better (see
+    # datasets.py's use_slot_fallbacks docstring) -- must stay off unless explicitly
+    # requested, so the known-good default pipeline isn't silently affected.
+    series_df = _multi_slot_series(study_id, ["COR_FLUID_FS"])
+    targets = _targets(study_id)
+    dataset = StudyDataset([study_id], series_df, series_root="fake_root", targets=targets, cache_images=False)
+
+    fake_image = np.full((dataset.resize_px, dataset.resize_px), 0.7, dtype=np.float32)
+    with patch("rsna_knee.datasets.load_series_representative", return_value=fake_image):
+        item = dataset[0]
+
+    cor_t1_idx = SERIES_SLOTS.index("COR_T1")
+    assert item["presence_mask"][cor_t1_idx] == 0.0
+    assert item["images"][cor_t1_idx].max() == 0
+
+
 def test_missing_cor_t1_falls_back_to_cor_fluid_fs():
     study_id = "study_1"
     # COR_T1 absent, COR_FLUID_FS present -- per SLOT_FALLBACKS, COR_T1's slot
     # position should still get filled (from COR_FLUID_FS) rather than left masked.
     series_df = _multi_slot_series(study_id, ["COR_FLUID_FS"])
     targets = _targets(study_id)
-    dataset = StudyDataset([study_id], series_df, series_root="fake_root", targets=targets, cache_images=False)
+    dataset = StudyDataset(
+        [study_id], series_df, series_root="fake_root", targets=targets, cache_images=False,
+        use_slot_fallbacks=True,
+    )
 
     fake_image = np.full((dataset.resize_px, dataset.resize_px), 0.7, dtype=np.float32)
     with patch("rsna_knee.datasets.load_series_representative", return_value=fake_image):
@@ -257,7 +278,10 @@ def test_missing_cor_t1_with_no_fallback_available_stays_masked():
     # same as any other genuinely-absent slot.
     series_df = _multi_slot_series(study_id, ["SAG_T1"])
     targets = _targets(study_id)
-    dataset = StudyDataset([study_id], series_df, series_root="fake_root", targets=targets, cache_images=False)
+    dataset = StudyDataset(
+        [study_id], series_df, series_root="fake_root", targets=targets, cache_images=False,
+        use_slot_fallbacks=True,
+    )
 
     fake_image = np.full((dataset.resize_px, dataset.resize_px), 0.7, dtype=np.float32)
     with patch("rsna_knee.datasets.load_series_representative", return_value=fake_image):
@@ -274,7 +298,10 @@ def test_present_cor_t1_is_not_overridden_by_fallback():
     # silently replaced by the fallback.
     series_df = _multi_slot_series(study_id, ["COR_T1", "COR_FLUID_FS"])
     targets = _targets(study_id)
-    dataset = StudyDataset([study_id], series_df, series_root="fake_root", targets=targets, cache_images=False)
+    dataset = StudyDataset(
+        [study_id], series_df, series_root="fake_root", targets=targets, cache_images=False,
+        use_slot_fallbacks=True,
+    )
 
     calls = []
 
