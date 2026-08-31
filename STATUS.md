@@ -1,7 +1,17 @@
-# Status (last updated 2026-08-30, ~22:30 CDT)
+# Status (last updated 2026-08-31)
 
 Read this file first in any new session/after context compaction to get oriented.
 Full strategy/reasoning is in PLAN.md; this file is the living "where are we now."
+
+## ACTIVE BLOCKER: Kaggle weekly GPU quota exhausted (30h/week)
+As of 2026-08-31, `kernels push` for a GPU kernel fails with "Maximum weekly GPU
+quota of 30.00 hours reached." No GPU kernels can run until this resets -- exact
+reset time unknown, check the Kaggle notebook editor's session panel for the real
+countdown rather than guessing. **CPU-only kernels (`enable_gpu: false`) are
+unaffected** -- confirmed working today (slot-coverage and slice-count diagnostics
+both ran fine under this same quota exhaustion). Base v2 (real score 0.812) is our
+best checkpoint and is already submitted -- nothing is at risk, GPU-dependent work
+is just paused until quota resets. See roadmap item 6 for the queued next GPU run.
 
 ## Competition
 RSNA Knee Abnormality Detection (Kaggle, slug `rsna-knee-abnormality-detection`).
@@ -356,15 +366,28 @@ didn't. Not yet submitted to competition -- ready to.
    from "2 epochs isn't enough exposure to a suddenly-richer input for a
    model already converged on K=1." Not submitted (not better locally).
 
-   **Second, cleaner test APPROVED and RUNNING**: `rsna-knee-base-
-   multislice-fresh` -- trains multi-slice (K=3) FRESH from pretrained
-   DINOv2-base for a full 6 epochs, matching v2's own epoch budget exactly
-   (same pattern as the base-fallback experiment), instead of a short
-   resumed extension. Estimated ~5h45m based on this run's per-epoch
-   timing (6 x ~3040s + setup + eval), safely under the 9h cap. This is the
-   decisive test of whether multi-slice input helps at all, isolated from
-   the "any further training past v2 degrades" confound. Reference to
-   beat: v2's tier1=0.7931/real=0.812.
+   **Second, cleaner test APPROVED but BLOCKED**: `rsna-knee-base-
+   multislice-fresh` was scoped (K=3 FRESH from pretrained DINOv2-base,
+   6 epochs matching v2's own budget) but `kernels push` failed with
+   "Maximum weekly GPU quota of 30.00 hours reached" -- **no more GPU
+   kernels can run until Kaggle's weekly quota resets.** Exact reset
+   time unknown (check the Kaggle notebook editor's session panel for the
+   real countdown -- don't guess/assert a specific time without checking
+   there first). CPU-only kernels are UNAFFECTED (confirmed: both
+   diagnostic kernels today, slot-coverage and slice-count, ran fine and
+   didn't count against this cap) -- any further data-analysis-only work
+   remains possible in the meantime. The notebook/kernel-metadata for
+   `submission_base_multislice_fresh` are built and committed, ready to
+   push the moment quota resets -- no rework needed, just re-run `kaggle
+   kernels push -p submission_base_multislice_fresh`.
+
+   This was estimated ~5h45m based on the first multi-slice run's
+   per-epoch timing (6 x ~3040s + setup + eval), safely under the 9h cap.
+   This is the decisive test of whether multi-slice input helps at all,
+   isolated from the "any further training past v2 degrades" confound.
+   Base v2 (real=0.812) remains our best and is already submitted --
+   nothing is at risk from this block, just further testing is paused.
+   Reference to beat: v2's tier1=0.7931/real=0.812.
 
 Explicitly deferred / do not start without asking again: external MRI datasets
 (MRNet/OAI) and RadImageNet-style domain-specific pretrained backbones.
