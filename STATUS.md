@@ -110,6 +110,10 @@ weights dataset (do that before any further continue-training off of it).
   - `submission_base_continue/` -> `rsna-knee-base-continue`: **COMPLETE**,
     base v1->v2 (+3ep), tier1=0.7931 (best single-checkpoint yet), tier2=0.7774.
     Not yet submitted to competition -- ready to submit.
+  - `submission_base_continue2/` -> `rsna-knee-base-continue-2`: **RUNNING**,
+    base v2->v3 (+3ep, resumed from rsna-knee-weights-base-v2), pushed while
+    waiting on user to submit base v2. Loss was still dropping at epoch 6
+    (0.4745->0.4486->0.4206), same justification as small's v13->v3->v4.
 
 ## Roadmap (user-approved sequence, execute in this order)
 1. ~~See how 9-epoch submission scores~~ -- done, tier1 confirmed reliable proxy
