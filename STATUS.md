@@ -276,14 +276,30 @@ didn't. Not yet submitted to competition -- ready to.
    LR change, is more consistent with a **silver-label noise ceiling**
    (past ~6 epochs of exposure, the model is fitting steven's report-
    derived label noise, not real signal, regardless of which training knob
-   is turned) than with either fix being individually wrong. If that's
-   right, a third knob-turning attempt (e.g. unfreezing more encoder
-   blocks) would likely just reproduce the same wall a third time --
-   deprioritized for that reason, not tried. This makes item 6 (which adds
-   genuinely new visual evidence per study, orthogonal to label quality)
-   the more promising remaining lever over further recipe tweaking, and
-   also weakly re-affirms item 4's conclusion (no better label source was
-   found, so this ceiling isn't easily fixable from the label side either).
+   is turned) than with either fix being individually wrong. This makes
+   item 6 (which adds genuinely new visual evidence per study, orthogonal
+   to label quality) the more promising remaining lever over further
+   recipe tweaking, and also weakly re-affirms item 4's conclusion (no
+   better label source was found, so this ceiling isn't easily fixable
+   from the label side either).
+
+   **Third experiment, CONFIRMS the ceiling.** During a long idle stretch
+   waiting on user input for item 6, ran one more cheap test:
+   `rsna-knee-base-continue-unfreeze4` (base v2 +3ep, last 4 of 12 blocks
+   unfrozen instead of 2, standard LR -- isolates capacity as the only
+   changed variable). Result: tier1=0.7774, tier2=0.7568 -- still below v2
+   (0.7931/0.7774), though the least-bad of the three extension attempts
+   (v3=0.7715/0.7496, lrdecay=0.7688/0.7093, unfreeze4=0.7774/0.7568).
+   Even meaningfully more capacity (32.8% of params trainable vs 16.5%)
+   couldn't beat just stopping at v2. **Three independent knobs (slot
+   content, LR, capacity) all land in the same degraded neighborhood below
+   v2 -- this is now a solidly 3-way-confirmed silver-label noise ceiling
+   around 6 epochs for this recipe, not a fixable bug.** Not submitted to
+   the competition (clearly not better than v2 locally, no reason to spend
+   a submission). **Stop trying to extend base v2's training via any
+   nearby recipe variation -- exhausted.** The only remaining levers are
+   item 6 (new visual evidence) or a genuinely different label source
+   (already investigated in item 4, none found).
 6. Multi-slice/volumetric input instead of one representative crop per series --
    NOT YET STARTED. Biggest remaining lever (only ~18% of each study's files
    are currently used) but also the highest-effort/highest-risk item (new
