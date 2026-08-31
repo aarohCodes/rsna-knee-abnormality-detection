@@ -300,13 +300,50 @@ didn't. Not yet submitted to competition -- ready to.
    nearby recipe variation -- exhausted.** The only remaining levers are
    item 6 (new visual evidence) or a genuinely different label source
    (already investigated in item 4, none found).
-6. Multi-slice/volumetric input instead of one representative crop per series --
-   NOT YET STARTED. Biggest remaining lever (only ~18% of each study's files
-   are currently used) but also the highest-effort/highest-risk item (new
-   architecture needed for slice-level aggregation, real risk of blowing the
-   9-hour runtime cap at inference on ~1300 test studies). Explicitly flagged
-   to the user as needing their buy-in before starting -- do not begin
-   implementation without an explicit go-ahead in the conversation itself.
+6. **Multi-slice/volumetric input -- APPROVED by user (via AskUserQuestion) and
+   IMPLEMENTED.** Scoped first with a CPU-only diagnostic
+   (`rsna-knee-slice-count-diagnostic`): median 30 slices/series (p10=20,
+   p90=39, p95=45) but a heavy tail (p99=160, max=320); using every slice
+   would be a 32.4x decode-volume increase, ruled out as blowing the 9-hour
+   cap. Settled on `slices_per_slot` = K evenly-spaced crops per slot
+   instead of one, K chosen small (3) for the first test.
+
+   **Implementation** (`src/rsna_knee/`, 102/102 tests pass, verified
+   against real local DICOM data, all committed):
+   - `data/dicom_io.py`: refactored `load_series_representative` into
+     `_load_ordered_dicom_stack` (decode+order, the expensive part) +
+     `_extract_representative_crop` (cheap numpy ops), so the new
+     `load_series_multi_slice(k=...)` pays the decode cost ONCE per series
+     regardless of k, not k times -- decode/IO dominates runtime, so this
+     matters a lot. New function is purely additive; existing function's
+     behavior is byte-for-byte unchanged (confirmed: k=1 output equals the
+     old function's output exactly).
+   - `datasets.py`: `StudyDataset(..., slices_per_slot=K)`; images shape
+     becomes `(S, K, resize_px, resize_px)` instead of `(S, resize_px,
+     resize_px)` when K>1. Default K=1 reproduces prior behavior exactly.
+   - `models/vision.py`: `KneeMultiLabelModel.forward` accepts both 5-dim
+     `(B,S,C,H,W)` and 6-dim `(B,S,K,C,H,W)` images; the K dim is
+     mean-pooled (NO new learnable params) before the existing
+     `SlotAttentionHead` runs unchanged. This is why base v2's checkpoint
+     loads and runs under the new code with zero shape/state_dict changes.
+   - `infer.py`: `run_inference`/`run_inference_tta` take `slices_per_slot`.
+     **Known limitation, documented in the code**: `load_series_multi_slice`
+     always spans the full ordered stack (fractions 0..1) and ignores
+     `center_fraction` entirely, so TTA's center_fraction variation is
+     currently a no-op when `slices_per_slot>1` -- use a single-pass config
+     until/unless TTA is redesigned around multi-slice.
+
+   **First validation run, RUNNING**: `rsna-knee-base-multislice` --
+   resumes base v2 (real score 0.812, tier1=0.7931) with
+   `slices_per_slot=3` (start/middle/end of each series, not just center),
+   BATCH_SIZE cut 8->3 to compensate for ~3x more images/study, only 2
+   additional epochs (short, for a first viability check), N_UNFROZEN_BLOCKS
+   and LR unchanged from v2 (isolating K as the only new variable, same
+   single-variable-change discipline as the v3/lrdecay/unfreeze4
+   experiments). No TTA this round. Reference to beat: tier1=0.7931,
+   tier2=0.7774, real=0.812. Waiting on results -- runtime is the open
+   question (estimated ~3.5-4.5h based on rough K-scaling of observed
+   per-epoch times, should fit the 9h cap, but not yet confirmed for real).
 
 Explicitly deferred / do not start without asking again: external MRI datasets
 (MRNet/OAI) and RadImageNet-style domain-specific pretrained backbones.
