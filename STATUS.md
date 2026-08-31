@@ -398,6 +398,31 @@ didn't. Not yet submitted to competition -- ready to.
    local code (no drift since last push), full test suite 102/102 passing.
    No issues found; genuinely ready to fire the moment quota resets.
 
+   **New candidate (item 7?) found while blocked, NOT started -- analysis
+   only, zero GPU cost**: re-analyzed the already-downloaded
+   `train_series_with_slots.csv` (from the slot-coverage diagnostic, no new
+   kernel needed) to characterize the 5,025 series that never match any of
+   our 6 slots. Found a clean, specific gap: **1,111 coronal
+   fluid-sensitive series have no fat-suppression and therefore no slot at
+   all**, even though the exact same combination already has a working slot
+   for sagittal (`SAG_FLUID_NOFS`) -- this isn't a new architectural
+   pattern, just filling in an inconsistently-applied one. Axial is even
+   less developed: no T1 slot (572 series unused) and no non-fat-sat fluid
+   slot (488 series unused) exist for that plane at all, only AX_FLUID_FS.
+
+   Architecturally this is a cleaner change than the failed COR_T1
+   fallback (roadmap item 5): that failure substituted one slot's content
+   INTO another slot's position (mask=1.0 for two different meanings,
+   likely the actual cause of that regression), whereas adding a genuine
+   new slot (e.g. `COR_FLUID_NOFS`) with its own consistent meaning and its
+   own attention query mirrors exactly how `SAG_FLUID_NOFS` already works
+   successfully -- not the same failure mode. Still, NOT starting this now:
+   don't want to add another variable while the multi-slice (K=3) test is
+   still mid-flight, and it needs its own clean single-variable validation
+   before trusting it, same discipline as everything else this session.
+   Worth raising with the user as a candidate next item once multi-slice
+   resolves.
+
 Explicitly deferred / do not start without asking again: external MRI datasets
 (MRNet/OAI) and RadImageNet-style domain-specific pretrained backbones.
 
