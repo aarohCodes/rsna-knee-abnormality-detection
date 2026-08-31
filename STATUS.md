@@ -266,6 +266,24 @@ didn't. Not yet submitted to competition -- ready to.
    both failed to beat it. A different lever (item 6, or a genuinely
    different architecture/data change) is needed for further gains, not
    more tweaking of this recipe.
+
+   **Synthesis (why this session stopped at 2 attempts, not 3+)**: the
+   coronal fallback and the LR-decay experiment changed two *completely
+   different* knobs (what data fills a slot vs. how fast weights update),
+   yet both landed in almost the same degraded zone (tier1 ~0.769-0.779,
+   both clearly worse than v2's 0.7931). That convergence, plus the LR
+   experiment barely changing the final training loss at all despite a 2x
+   LR change, is more consistent with a **silver-label noise ceiling**
+   (past ~6 epochs of exposure, the model is fitting steven's report-
+   derived label noise, not real signal, regardless of which training knob
+   is turned) than with either fix being individually wrong. If that's
+   right, a third knob-turning attempt (e.g. unfreezing more encoder
+   blocks) would likely just reproduce the same wall a third time --
+   deprioritized for that reason, not tried. This makes item 6 (which adds
+   genuinely new visual evidence per study, orthogonal to label quality)
+   the more promising remaining lever over further recipe tweaking, and
+   also weakly re-affirms item 4's conclusion (no better label source was
+   found, so this ceiling isn't easily fixable from the label side either).
 6. Multi-slice/volumetric input instead of one representative crop per series --
    NOT YET STARTED. Biggest remaining lever (only ~18% of each study's files
    are currently used) but also the highest-effort/highest-risk item (new
