@@ -103,6 +103,65 @@ def test_full_model_forward_shape_no_pretrained_download():
     assert torch.isfinite(logits).all()
 
 
+def test_full_model_forward_accepts_6dim_multi_slice_input():
+    """Roadmap item 6: images can carry K crops per slot instead of one.
+    (B, S, K, C, H, W) must work end to end, output shape unaffected by K."""
+    torch.manual_seed(0)
+    model = KneeMultiLabelModel(
+        num_slots=6, num_labels=12, backbone_name="resnet18", pretrained=False
+    )
+    model.eval()
+    images = torch.randn(2, 6, 4, 3, 64, 64)  # K=4 crops per slot
+    presence_mask = torch.ones(2, 6)
+    with torch.no_grad():
+        logits = model(images, presence_mask)
+    assert logits.shape == (2, 12)
+    assert torch.isfinite(logits).all()
+
+
+def test_multi_slice_k1_matches_5dim_input():
+    """A 6-dim input with K=1 must be numerically identical to the equivalent 5-dim
+    input -- mean-pooling over a single element is a no-op, so this is the same
+    computation either way. This is what makes existing checkpoints (trained on
+    5-dim, K=1 implied) safe to keep using: nothing about the forward pass's math
+    changes for them."""
+    torch.manual_seed(0)
+    model = KneeMultiLabelModel(
+        num_slots=6, num_labels=12, backbone_name="resnet18", pretrained=False
+    )
+    model.eval()
+    images_5d = torch.randn(2, 6, 3, 64, 64)
+    images_6d = images_5d.unsqueeze(2)  # (2, 6, 1, 3, 64, 64)
+    presence_mask = torch.ones(2, 6)
+
+    with torch.no_grad():
+        logits_5d = model(images_5d, presence_mask)
+        logits_6d = model(images_6d, presence_mask)
+
+    assert torch.allclose(logits_5d, logits_6d, atol=1e-5)
+
+
+def test_multi_slice_mean_pools_over_k_not_just_uses_first():
+    """Sanity check that all K slices actually contribute (via mean), not just the
+    first one -- vary only the 2nd..Kth slices and confirm the output changes."""
+    torch.manual_seed(0)
+    model = KneeMultiLabelModel(
+        num_slots=6, num_labels=12, backbone_name="resnet18", pretrained=False
+    )
+    model.eval()
+    presence_mask = torch.ones(1, 6)
+
+    images_a = torch.randn(1, 6, 3, 3, 64, 64)
+    images_b = images_a.clone()
+    images_b[:, :, 1:] = torch.randn_like(images_b[:, :, 1:])  # perturb slices 2 and 3 only
+
+    with torch.no_grad():
+        logits_a = model(images_a, presence_mask)
+        logits_b = model(images_b, presence_mask)
+
+    assert not torch.allclose(logits_a, logits_b)
+
+
 class _FakeHFBackbone(nn.Module):
     """Stands in for a `transformers` AutoModel instance without downloading or
     loading real weights -- records the pixel_values it was called with so tests can

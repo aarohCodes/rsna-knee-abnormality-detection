@@ -13,7 +13,12 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from rsna_knee.data.dicom_io import SERIES_SLOTS, SLOT_FALLBACKS, load_series_representative
+from rsna_knee.data.dicom_io import (
+    SERIES_SLOTS,
+    SLOT_FALLBACKS,
+    load_series_multi_slice,
+    load_series_representative,
+)
 from rsna_knee.data.preprocess import DEFAULT_PHYSICAL_CROP_MM, DEFAULT_RESIZE_PX
 from rsna_knee.metrics import LABEL_COLUMNS
 
@@ -74,6 +79,7 @@ class StudyDataset(Dataset):
         max_cache_studies: int = DEFAULT_MAX_CACHE_STUDIES,
         center_fraction: float = 0.5,
         use_slot_fallbacks: bool = False,
+        slices_per_slot: int = 1,
     ):
         self.study_ids = list(study_ids)
         self.series_by_study = {
@@ -96,6 +102,14 @@ class StudyDataset(Dataset):
         # (e.g. a distinct fallback indicator) but must not silently affect the
         # known-good default pipeline used by our current best checkpoint (base v2).
         self.use_slot_fallbacks = use_slot_fallbacks
+        # 1 (default) = existing single-crop-per-slot behavior, images shaped
+        # (S, resize_px, resize_px) -- unchanged for every existing caller. >1 loads
+        # `slices_per_slot` evenly-spaced crops per slot instead of one (roadmap item
+        # 6: only ~18% of each study's files were being used), images shaped
+        # (S, slices_per_slot, resize_px, resize_px); KneeMultiLabelModel.forward
+        # accepts either shape (mean-pools over the extra dimension when present, a
+        # no-op for slices_per_slot=1, so existing checkpoints stay loadable).
+        self.slices_per_slot = slices_per_slot
         # Which slice-window to sample per series (0.5 = middle, the default). TTA
         # varies this across several StudyDataset instances at inference time and
         # combines their predictions -- see infer.run_inference_tta.
@@ -111,6 +125,20 @@ class StudyDataset(Dataset):
     def __len__(self) -> int:
         return len(self.study_ids)
 
+    def _load_one_series(self, series_dir: Path) -> np.ndarray | None:
+        """Load either one crop (resize_px, resize_px) or `slices_per_slot` evenly-
+        spaced crops (slices_per_slot, resize_px, resize_px) from a series, depending
+        on `self.slices_per_slot` -- the single call site every slot-filling branch
+        below goes through, so they don't need to duplicate this branch themselves.
+        """
+        if self.slices_per_slot <= 1:
+            return load_series_representative(
+                series_dir, self.physical_crop_mm, self.resize_px, center_fraction=self.center_fraction
+            )
+        return load_series_multi_slice(
+            series_dir, self.physical_crop_mm, self.resize_px, k=self.slices_per_slot
+        )
+
     def _load_images_and_mask(self, study_id: str) -> tuple[np.ndarray, np.ndarray]:
         if self.cache_images and study_id in self._cache:
             self._cache.move_to_end(study_id)
@@ -118,7 +146,12 @@ class StudyDataset(Dataset):
 
         series_rows = self.series_by_study.get(study_id, pd.DataFrame(columns=["slot"]))
 
-        images = np.zeros((len(SERIES_SLOTS), self.resize_px, self.resize_px), dtype=np.float32)
+        per_slot_shape = (
+            (len(SERIES_SLOTS), self.resize_px, self.resize_px)
+            if self.slices_per_slot <= 1
+            else (len(SERIES_SLOTS), self.slices_per_slot, self.resize_px, self.resize_px)
+        )
+        images = np.zeros(per_slot_shape, dtype=np.float32)
         mask = np.zeros(len(SERIES_SLOTS), dtype=np.float32)
 
         for slot_idx, slot in enumerate(SERIES_SLOTS):
@@ -134,9 +167,7 @@ class StudyDataset(Dataset):
             if matches.empty:
                 continue
             series_dir = self.series_root / study_id / matches.iloc[0]["SeriesInstanceUID"]
-            img = load_series_representative(
-                series_dir, self.physical_crop_mm, self.resize_px, center_fraction=self.center_fraction
-            )
+            img = self._load_one_series(series_dir)
             if img is not None:
                 images[slot_idx] = img
                 mask[slot_idx] = 1.0
@@ -147,9 +178,7 @@ class StudyDataset(Dataset):
             # than feeding the model an all-masked study (undefined softmax).
             for _, row in series_rows.iterrows():
                 series_dir = self.series_root / study_id / row["SeriesInstanceUID"]
-                img = load_series_representative(
-                series_dir, self.physical_crop_mm, self.resize_px, center_fraction=self.center_fraction
-            )
+                img = self._load_one_series(series_dir)
                 if img is not None:
                     images[0] = img
                     mask[0] = 1.0
@@ -164,7 +193,9 @@ class StudyDataset(Dataset):
     def __getitem__(self, idx: int) -> dict:
         study_id = self.study_ids[idx]
         images, mask = self._load_images_and_mask(study_id)
-        images_3ch = np.repeat(images[:, np.newaxis, :, :], 3, axis=1)  # (S, 3, H, W)
+        # (S, H, W) -> (S, 3, H, W), or (S, K, H, W) -> (S, K, 3, H, W) when
+        # slices_per_slot > 1 -- 3-channel repeat always happens on the last two dims.
+        images_3ch = np.repeat(images[..., np.newaxis, :, :], 3, axis=-3)
 
         if study_id in self.targets.index:
             target_row = self.targets.loc[study_id]

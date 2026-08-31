@@ -30,19 +30,24 @@ def run_inference(
     device: str,
     batch_size: int = 4,
     center_fraction: float = 0.5,
+    slices_per_slot: int = 1,
 ) -> pd.DataFrame:
     """Run `model` over every study in `study_ids` and return a dataframe shaped
     exactly like sample_submission.csv (StudyInstanceUID + the 12 label columns,
     sigmoid-activated probabilities). `center_fraction` selects which slice-window
     each series is sampled from (0.5 = middle, the default) -- see
-    run_inference_tta for combining multiple values.
+    run_inference_tta for combining multiple values. `slices_per_slot` must match
+    whatever the model was trained with (see StudyDataset/KneeMultiLabelModel) --
+    passing a different value than training still runs without error (both handle
+    any K), but the input distribution would differ from what the model learned.
     """
     # StudyDataset needs a `targets` frame; inference has no real targets, so pass an
     # empty one -- every study falls through to the neutral/zero-weight branch, which
     # is fine since targets/weights aren't used at inference time.
     empty_targets = pd.DataFrame({"StudyInstanceUID": []})
     dataset = StudyDataset(
-        study_ids, series_with_slots, series_root, empty_targets, center_fraction=center_fraction
+        study_ids, series_with_slots, series_root, empty_targets, center_fraction=center_fraction,
+        slices_per_slot=slices_per_slot,
     )
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
@@ -68,6 +73,7 @@ def run_inference_tta(
     device: str,
     batch_size: int = 4,
     center_fractions: tuple[float, ...] = DEFAULT_TTA_CENTER_FRACTIONS,
+    slices_per_slot: int = 1,
 ) -> pd.DataFrame:
     """Test-time augmentation: run inference once per `center_fractions` value (each
     sampling a different, overlapping-but-distinct slice window per series) and
@@ -75,11 +81,22 @@ def run_inference_tta(
     order and a raw average would let whichever pass produced more extreme values
     dominate (see metrics.rank_average). Each pass reuses `run_inference`, so this is
     the same tested code path repeated with a different `center_fraction`, not a
-    separate implementation.
+    separate implementation. `slices_per_slot` must match training, same as
+    `run_inference` -- passed through unchanged to every pass.
+
+    Note: `slices_per_slot > 1` and TTA don't currently combine usefully.
+    `load_series_multi_slice` (used whenever `slices_per_slot > 1`) always spans the
+    full ordered stack (fractions 0..1 evenly spaced) and ignores `center_fraction`
+    entirely, so every "TTA pass" below would load identical multi-slice input and
+    this would just repeat the same forward pass `len(center_fractions)` times for no
+    benefit. Use `center_fractions=(0.5,)` (a single pass) when `slices_per_slot > 1`
+    until/unless TTA is redesigned to vary something multi-slice loading actually
+    reads (e.g. an offset applied to the evenly-spaced fractions).
     """
     passes = [
         run_inference(
-            model, study_ids, series_with_slots, series_root, device, batch_size, center_fraction=cf
+            model, study_ids, series_with_slots, series_root, device, batch_size,
+            center_fraction=cf, slices_per_slot=slices_per_slot,
         )
         for cf in center_fractions
     ]

@@ -191,29 +191,15 @@ def classify_slot(
     return None
 
 
-def load_series_representative(
-    series_dir: Path,
-    physical_crop_mm: float = DEFAULT_PHYSICAL_CROP_MM,
-    resize_px: int = DEFAULT_RESIZE_PX,
-    n_percentile_slices: int = 3,
-    center_fraction: float = 0.5,
-) -> np.ndarray | None:
-    """Load one representative, preprocessed image for a series: order its slices by
-    true spatial position, take the slice at `center_fraction` through the ordered
-    stack (0.5 = middle, the default), crop to a fixed physical FOV, resize to a
-    Nyquist-adequate pixel pitch, and percentile-normalize using a small sample of
-    slices around that center (not just the one slice) for a more stable intensity
-    range. `center_fraction` != 0.5 is for multi-crop TTA at inference time -- e.g.
-    0.35/0.5/0.65 sample three different, overlapping-but-distinct views of the same
-    series to average over, rather than relying on a single slice choice.
+def _load_ordered_dicom_stack(series_dir: Path) -> list | None:
+    """Read and geometrically order every slice in a series -- the expensive part
+    (file I/O + DICOM parsing) of loading a representative crop. Factored out of
+    `load_series_representative` so `load_series_multi_slice` can extract several
+    crops from one series while paying this decode cost only once, instead of once
+    per crop (see its docstring for why that matters).
 
-    `n_percentile_slices` defaults to 3 (was 5) -- decode/IO dominates our runtime
-    (established across every kernel run so far), and 3 vs 5 slices makes little
-    difference to percentile-normalization stability while cutting a real fraction
-    of the per-series decode cost.
-
-    Returns None if the series has no decodable slices or none of them survive the
-    physical-FOV crop (their acquired field of view is smaller than the crop target).
+    Returns the ordered list of pydicom Datasets, or None if the series has no
+    decodable slices.
     """
     paths = sorted(series_dir.glob("*.dcm"))
     if not paths:
@@ -235,8 +221,20 @@ def load_series_representative(
 
     ordered_paths = order_slices(list(zip((p for p, _ in datasets), geometries)))
     path_to_ds = {p: ds for p, ds in datasets}
-    ordered_ds = [path_to_ds[p] for p in ordered_paths]
+    return [path_to_ds[p] for p in ordered_paths]
 
+
+def _extract_representative_crop(
+    ordered_ds: list,
+    physical_crop_mm: float,
+    resize_px: int,
+    n_percentile_slices: int,
+    center_fraction: float,
+) -> np.ndarray | None:
+    """Extract one representative, preprocessed crop at `center_fraction` through an
+    already-ordered slice stack (see `_load_ordered_dicom_stack`). Returns None if
+    none of the sampled slices survive the physical-FOV crop.
+    """
     center = int(round(center_fraction * (len(ordered_ds) - 1)))
     center = max(0, min(len(ordered_ds) - 1, center))
     half_window = n_percentile_slices // 2
@@ -265,3 +263,74 @@ def load_series_representative(
     normalized = normalize_intensity(stack)
     representative = normalized[len(normalized) // 2]
     return resize_to(representative, resize_px)
+
+
+def load_series_representative(
+    series_dir: Path,
+    physical_crop_mm: float = DEFAULT_PHYSICAL_CROP_MM,
+    resize_px: int = DEFAULT_RESIZE_PX,
+    n_percentile_slices: int = 3,
+    center_fraction: float = 0.5,
+) -> np.ndarray | None:
+    """Load one representative, preprocessed image for a series: order its slices by
+    true spatial position, take the slice at `center_fraction` through the ordered
+    stack (0.5 = middle, the default), crop to a fixed physical FOV, resize to a
+    Nyquist-adequate pixel pitch, and percentile-normalize using a small sample of
+    slices around that center (not just the one slice) for a more stable intensity
+    range. `center_fraction` != 0.5 is for multi-crop TTA at inference time -- e.g.
+    0.35/0.5/0.65 sample three different, overlapping-but-distinct views of the same
+    series to average over, rather than relying on a single slice choice.
+
+    `n_percentile_slices` defaults to 3 (was 5) -- decode/IO dominates our runtime
+    (established across every kernel run so far), and 3 vs 5 slices makes little
+    difference to percentile-normalization stability while cutting a real fraction
+    of the per-series decode cost.
+
+    Returns None if the series has no decodable slices or none of them survive the
+    physical-FOV crop (their acquired field of view is smaller than the crop target).
+    """
+    ordered_ds = _load_ordered_dicom_stack(series_dir)
+    if ordered_ds is None:
+        return None
+    return _extract_representative_crop(
+        ordered_ds, physical_crop_mm, resize_px, n_percentile_slices, center_fraction
+    )
+
+
+def load_series_multi_slice(
+    series_dir: Path,
+    physical_crop_mm: float = DEFAULT_PHYSICAL_CROP_MM,
+    resize_px: int = DEFAULT_RESIZE_PX,
+    n_percentile_slices: int = 3,
+    k: int = 3,
+) -> np.ndarray | None:
+    """Load `k` representative crops from one series, evenly spaced through the
+    ordered slice stack (center_fraction = 0, 1/(k-1), 2/(k-1), ..., 1 -- e.g. k=3
+    gives fractions 0.0/0.5/1.0), instead of just the single middle crop
+    `load_series_representative` returns.
+
+    Decodes the series only ONCE regardless of `k` (via `_load_ordered_dicom_stack`)
+    -- calling `load_series_representative` k times instead would re-read and
+    re-parse every DICOM file in the series k times over, and decode/IO already
+    dominates our runtime (see that function's docstring), so that would scale
+    badly. Only the cheap per-crop extraction (numpy crop/normalize/resize) repeats
+    k times here.
+
+    Returns an array of shape (k, resize_px, resize_px), or None if the series has
+    no decodable slices or any of the k crops fails (same failure semantics as
+    `load_series_representative`, applied per-crop).
+    """
+    ordered_ds = _load_ordered_dicom_stack(series_dir)
+    if ordered_ds is None:
+        return None
+
+    fractions = [0.5] if k <= 1 else [i / (k - 1) for i in range(k)]
+    crops = []
+    for cf in fractions:
+        crop = _extract_representative_crop(
+            ordered_ds, physical_crop_mm, resize_px, n_percentile_slices, cf
+        )
+        if crop is None:
+            return None
+        crops.append(crop)
+    return np.stack(crops, axis=0)

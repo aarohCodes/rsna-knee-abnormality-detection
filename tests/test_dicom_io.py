@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -8,6 +9,7 @@ from rsna_knee.data.dicom_io import (
     classify_slot,
     classify_weighting,
     knee_side,
+    load_series_multi_slice,
     order_slices,
     slice_scalar_position,
 )
@@ -112,3 +114,58 @@ def test_classify_weighting(seq, tr, te, expected):
 )
 def test_classify_slot(plane, weighting, fat_sat, expected):
     assert classify_slot(plane, weighting, fat_sat) == expected
+
+
+def test_load_series_multi_slice_decodes_series_only_once():
+    # The whole point of load_series_multi_slice vs calling load_series_representative
+    # k times: decode (file I/O + DICOM parsing) happens once regardless of k, only
+    # the cheap crop/normalize/resize step repeats. Mock the decode step and assert
+    # it's called exactly once even for k=5.
+    fake_ordered_ds = [object()] * 30  # stand-in for an ordered DICOM stack
+    fake_crop = np.zeros((16, 16), dtype=np.float32)
+    with patch("rsna_knee.data.dicom_io._load_ordered_dicom_stack", return_value=fake_ordered_ds) as mock_decode, \
+         patch("rsna_knee.data.dicom_io._extract_representative_crop", return_value=fake_crop) as mock_extract:
+        result = load_series_multi_slice(Path("fake_series"), k=5)
+
+    assert mock_decode.call_count == 1
+    assert mock_extract.call_count == 5
+    assert result.shape == (5, 16, 16)
+
+
+def test_load_series_multi_slice_uses_evenly_spaced_fractions():
+    fake_ordered_ds = [object()] * 30
+    fake_crop = np.zeros((16, 16), dtype=np.float32)
+    with patch("rsna_knee.data.dicom_io._load_ordered_dicom_stack", return_value=fake_ordered_ds), \
+         patch("rsna_knee.data.dicom_io._extract_representative_crop", return_value=fake_crop) as mock_extract:
+        load_series_multi_slice(Path("fake_series"), k=3)
+
+    used_fractions = [call.args[-1] for call in mock_extract.call_args_list]
+    assert used_fractions == pytest.approx([0.0, 0.5, 1.0])
+
+
+def test_load_series_multi_slice_k1_uses_middle_fraction():
+    fake_ordered_ds = [object()] * 30
+    fake_crop = np.zeros((16, 16), dtype=np.float32)
+    with patch("rsna_knee.data.dicom_io._load_ordered_dicom_stack", return_value=fake_ordered_ds), \
+         patch("rsna_knee.data.dicom_io._extract_representative_crop", return_value=fake_crop) as mock_extract:
+        result = load_series_multi_slice(Path("fake_series"), k=1)
+
+    used_fractions = [call.args[-1] for call in mock_extract.call_args_list]
+    assert used_fractions == pytest.approx([0.5])
+    assert result.shape == (1, 16, 16)
+
+
+def test_load_series_multi_slice_returns_none_when_series_undecodable():
+    with patch("rsna_knee.data.dicom_io._load_ordered_dicom_stack", return_value=None):
+        result = load_series_multi_slice(Path("fake_series"), k=3)
+    assert result is None
+
+
+def test_load_series_multi_slice_returns_none_if_any_crop_fails():
+    fake_ordered_ds = [object()] * 30
+    fake_crop = np.zeros((16, 16), dtype=np.float32)
+    # second crop fails (e.g. that slice's FOV doesn't survive the physical crop)
+    with patch("rsna_knee.data.dicom_io._load_ordered_dicom_stack", return_value=fake_ordered_ds), \
+         patch("rsna_knee.data.dicom_io._extract_representative_crop", side_effect=[fake_crop, None, fake_crop]):
+        result = load_series_multi_slice(Path("fake_series"), k=3)
+    assert result is None

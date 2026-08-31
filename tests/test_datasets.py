@@ -315,3 +315,67 @@ def test_present_cor_t1_is_not_overridden_by_fallback():
     # the COR_T1 row's own series (series_0) must be the one used for that slot, not
     # COR_FLUID_FS's series_1
     assert any("series_0" in c for c in calls)
+
+
+def test_slices_per_slot_default_uses_single_crop_loader():
+    study_id = "study_1"
+    series_df = _series_with_slots(study_id)
+    targets = _targets(study_id)
+    dataset = StudyDataset([study_id], series_df, series_root="fake_root", targets=targets, cache_images=False)
+
+    fake_image = np.full((dataset.resize_px, dataset.resize_px), 0.5, dtype=np.float32)
+    with patch("rsna_knee.datasets.load_series_representative", return_value=fake_image) as mock_single, \
+         patch("rsna_knee.datasets.load_series_multi_slice") as mock_multi:
+        item = dataset[0]
+
+    assert mock_single.call_count == 1
+    assert mock_multi.call_count == 0
+    assert item["images"].shape == (len(SERIES_SLOTS), 3, dataset.resize_px, dataset.resize_px)
+    assert item["presence_mask"].shape == (len(SERIES_SLOTS),)
+
+
+def test_slices_per_slot_greater_than_one_uses_multi_slice_loader():
+    study_id = "study_1"
+    series_df = _series_with_slots(study_id)
+    targets = _targets(study_id)
+    K = 4
+    dataset = StudyDataset(
+        [study_id], series_df, series_root="fake_root", targets=targets, cache_images=False,
+        slices_per_slot=K,
+    )
+
+    fake_stack = np.full((K, dataset.resize_px, dataset.resize_px), 0.5, dtype=np.float32)
+    with patch("rsna_knee.datasets.load_series_representative") as mock_single, \
+         patch("rsna_knee.datasets.load_series_multi_slice", return_value=fake_stack) as mock_multi:
+        item = dataset[0]
+
+    assert mock_single.call_count == 0
+    assert mock_multi.call_count == 1
+    assert mock_multi.call_args.kwargs["k"] == K
+    # (S, K, 3, H, W) -- one extra dim vs the slices_per_slot=1 case
+    assert item["images"].shape == (len(SERIES_SLOTS), K, 3, dataset.resize_px, dataset.resize_px)
+    assert item["presence_mask"].shape == (len(SERIES_SLOTS),)  # unchanged -- still one flag per slot, not per slice
+
+
+def test_slices_per_slot_absent_slot_stays_zero_and_masked():
+    study_id = "study_1"
+    # Only SAG_T1 present -- every other slot (including its K sub-images) should
+    # stay all-zero and masked, same semantics as the K=1 case.
+    series_df = _series_with_slots(study_id, slot="SAG_T1")
+    targets = _targets(study_id)
+    K = 3
+    dataset = StudyDataset(
+        [study_id], series_df, series_root="fake_root", targets=targets, cache_images=False,
+        slices_per_slot=K,
+    )
+
+    fake_stack = np.full((K, dataset.resize_px, dataset.resize_px), 0.7, dtype=np.float32)
+    with patch("rsna_knee.datasets.load_series_multi_slice", return_value=fake_stack):
+        item = dataset[0]
+
+    sag_t1_idx = SERIES_SLOTS.index("SAG_T1")
+    other_idx = SERIES_SLOTS.index("COR_FLUID_FS")
+    assert item["presence_mask"][sag_t1_idx] == 1.0
+    assert item["presence_mask"][other_idx] == 0.0
+    assert item["images"][sag_t1_idx].max() > 0
+    assert item["images"][other_idx].max() == 0

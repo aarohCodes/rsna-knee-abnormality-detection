@@ -142,10 +142,24 @@ class KneeMultiLabelModel(nn.Module):
         )
 
     def forward(self, images: torch.Tensor, presence_mask: torch.Tensor) -> torch.Tensor:
-        """images: (B, S, C, H, W), presence_mask: (B, S) -> logits (B, num_labels)."""
-        b, s, c, h, w = images.shape
-        flat = images.view(b * s, c, h, w)
-        embeddings = self.encoder(flat).view(b, s, -1)
+        """images: (B, S, C, H, W) or (B, S, K, C, H, W), presence_mask: (B, S) ->
+        logits (B, num_labels).
+
+        The 6-dim form is roadmap item 6 (multi-slice/volumetric input): K crops per
+        slot instead of one representative crop. Each of the B*S*K images is embedded
+        independently, then mean-pooled over K back down to one embedding per slot
+        before the existing per-diagnosis attention pooling (SlotAttentionHead) runs
+        unchanged -- mean-pooling has no learnable parameters, so a checkpoint trained
+        with one K value loads and runs under any other without shape errors, and the
+        5-dim form is exactly the K=1 case (mean over a single element is a no-op).
+        """
+        if images.dim() == 5:
+            b, s, c, h, w = images.shape
+            k = 1
+        else:
+            b, s, k, c, h, w = images.shape
+        flat = images.reshape(b * s * k, c, h, w)
+        embeddings = self.encoder(flat).view(b, s, k, -1).mean(dim=2)
         return self.head(embeddings, presence_mask)
 
     def discriminative_param_groups(self, encoder_lr: float, head_lr: float) -> list[dict]:
