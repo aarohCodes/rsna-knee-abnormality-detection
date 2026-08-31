@@ -56,12 +56,16 @@ clearly-worse.
 | small v13 | 3 | 0.7752 | 0.7368 |
 | small v3 | 6 | 0.7833 | 0.7318 |
 | small v4 | 9 | 0.7888 | 0.7587 |
-| small ensemble (v13+v3+v4) | -- | **0.7911** | 0.7516 |
+| small ensemble (v13+v3+v4) | -- | 0.7911 (regressed to 0.775 real) | 0.7516 |
 | base v1 | 3 | 0.7820 | 0.7891 |
-| base v2 | 6 (continuing now) | pending | pending |
+| **base v2** | 6 | **0.7931** | 0.7774 |
 
-Base already beats small at matched epoch count (3ep: 0.7820 vs 0.7752) --
-continuing to train it is likely to become the new best.
+Base v2 is the best single (non-ensembled) checkpoint tier1 to date, and its
+epoch-scaling shape (single model, +3 epochs) matches the case that held up on
+real LB before (small v13->v3), not the ensemble case that didn't. Not yet
+submitted to competition -- ready to. `model_base_v2.pt` downloaded to
+`data/interim/kernel_output_base_continue_v1/`, not yet re-uploaded as a
+weights dataset (do that before any further continue-training off of it).
 
 ## What's built (all in `src/rsna_knee/`, tested, committed)
 - Full DICOM pipeline: geometry-based slice ordering, series-slot classification,
@@ -98,23 +102,33 @@ continuing to train it is likely to become the new best.
   - `submission_continue2/` -> `rsna-knee-continue-training-2`: v3->v4 (+3ep)
   - `submission_ensemble/` -> `rsna-knee-ensemble`: loads v13+v3+v4, evaluates solo
     + ensembled on holdout, submits whichever combo wins (currently: all-3
-    ensemble, tier1=0.7911)
+    ensemble, tier1=0.7911) -- **submitted, scored 0.775 real, a REGRESSION
+    below the plain 6-epoch model's 0.782. Don't resubmit this kernel as-is.**
   - `submission_base/` -> `rsna-knee-dinov2-base`: base v1, 3 fresh epochs, DONE
     (tier1=0.7820, tier2=0.7891)
-  - `submission_base_continue/` -> `rsna-knee-base-continue`: **currently RUNNING**,
-    base v1->v2 (+3ep, resumed from rsna-knee-weights-base-v1)
+  - `submission_base_continue/` -> `rsna-knee-base-continue`: **COMPLETE**,
+    base v1->v2 (+3ep), tier1=0.7931 (best single-checkpoint yet), tier2=0.7774.
+    Not yet submitted to competition -- ready to submit.
 
 ## Roadmap (user-approved sequence, execute in this order)
 1. ~~See how 9-epoch submission scores~~ -- done, tier1 confirmed reliable proxy
-2. ~~Ensemble v13+v3+v4 via rank averaging~~ -- done, small but real gain confirmed
-   (measure, don't assume -- these are correlated checkpoints from one training
-   trajectory, not independently trained, so this had to be verified empirically)
-3. **DINOv2-base instead of -small -- IN PROGRESS.** v1 (3ep) done and already
-   beats small at matched epoch count. Continue-training kernel running now
-   (`rsna-knee-base-continue`, v1->v2, +3ep). When it finishes: compare tier1
-   against the table above; if still improving, keep extending the same way
-   v13->v3->v4 worked for small, then consider ensembling base checkpoints
-   together and/or with the small-backbone checkpoints.
+   for single-model epoch scaling (not for ensembles, see item 2)
+2. ~~Ensemble v13+v3+v4 via rank averaging~~ -- done, but the real submission
+   (0.775) came back WORSE than the plain 6-epoch model (0.782) despite a
+   higher predicted tier1 (0.7911 vs 0.7833). Correcting an earlier wrong
+   note here that called this "a real gain confirmed" -- it wasn't; that was
+   written before the real submission result came back. Lesson: tier1 deltas
+   between correlated/ensembled checkpoints are not reliable without a real
+   submission to confirm, even though tier1 deltas from single-model epoch
+   scaling have held up well (see item 1, item 3).
+3. **DINOv2-base instead of -small -- v2 DONE, best single checkpoint yet
+   (tier1=0.7931).** Ready to submit to competition (not yet submitted).
+   Next decision: submit base v2 first to get a real-LB confirmation (given
+   the item-2 lesson that tier1 alone isn't fully trustworthy), then decide
+   whether to keep extending (v2->v3, +3 more epochs) based on how the real
+   score compares to tier1's prediction -- do NOT jump straight to ensembling
+   base checkpoints together without a real-submission check first, per the
+   item-2 lesson.
 4. Combine multiple independent silver-label sources (rank-average `steven`'s
    labels with another *verified-not-leaked* public source) to push past the
    ~0.89 AUC ceiling any single silver source has against gold
@@ -127,13 +141,15 @@ continuing to train it is likely to become the new best.
 Explicitly deferred / do not start without asking again: external MRI datasets
 (MRNet/OAI) and RadImageNet-style domain-specific pretrained backbones.
 
-## How to check on the running base-continue kernel
-```
-.venv/Scripts/kaggle.exe kernels status aarohnanoti/rsna-knee-base-continue
-# once COMPLETE:
-.venv/Scripts/kaggle.exe kernels output aarohnanoti/rsna-knee-base-continue -p data/interim/kernel_output_base_continue_v1 --force
-# then read data/interim/kernel_output_base_continue_v1/rsna-knee-base-continue.log for tier1/tier2 AUC
-```
+## Next action (pending user)
+`rsna-knee-base-continue` (base v2, tier1=0.7931) is COMPLETE and ready to
+submit -- waiting on the user to open
+https://www.kaggle.com/code/aarohnanoti/rsna-knee-base-continue and click
+"Submit to Competition" (I have no API access to do this). 5/5 daily
+submissions available (cap reset at 2026-08-31 00:00 UTC, all prior 5 used
+on 2026-08-30 UTC). `model_base_v2.pt` still needs re-uploading as a
+`rsna-knee-weights-base-v2` Kaggle dataset before any further continue-
+training off of it (currently only sits in `data/interim/kernel_output_base_continue_v1/`).
 
 ## Submission mechanics reminder
 I can push/run kernels via the Kaggle API, but **clicking "Submit to Competition"
