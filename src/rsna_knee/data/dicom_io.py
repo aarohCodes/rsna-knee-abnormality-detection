@@ -183,7 +183,7 @@ def load_series_representative(
     series_dir: Path,
     physical_crop_mm: float = DEFAULT_PHYSICAL_CROP_MM,
     resize_px: int = DEFAULT_RESIZE_PX,
-    n_percentile_slices: int = 5,
+    n_percentile_slices: int = 3,
     center_fraction: float = 0.5,
 ) -> np.ndarray | None:
     """Load one representative, preprocessed image for a series: order its slices by
@@ -194,6 +194,11 @@ def load_series_representative(
     range. `center_fraction` != 0.5 is for multi-crop TTA at inference time -- e.g.
     0.35/0.5/0.65 sample three different, overlapping-but-distinct views of the same
     series to average over, rather than relying on a single slice choice.
+
+    `n_percentile_slices` defaults to 3 (was 5) -- decode/IO dominates our runtime
+    (established across every kernel run so far), and 3 vs 5 slices makes little
+    difference to percentile-normalization stability while cutting a real fraction
+    of the per-series decode cost.
 
     Returns None if the series has no decodable slices or none of them survive the
     physical-FOV crop (their acquired field of view is smaller than the crop target).

@@ -25,6 +25,41 @@ from rsna_knee.metrics import LABEL_COLUMNS
 # per-worker cache size keeps memory bounded regardless of worker count or dataset size.
 DEFAULT_MAX_CACHE_STUDIES = 1500
 
+# float32 single-channel image per slot, before the 3-channel repeat done at
+# __getitem__ time (the cache stores pre-repeat images -- see _load_images_and_mask).
+_BYTES_PER_STUDY_DEFAULT_MB = len(SERIES_SLOTS) * DEFAULT_RESIZE_PX * DEFAULT_RESIZE_PX * 4 / 1024**2
+
+
+def compute_safe_max_cache_studies(
+    num_workers: int,
+    target_fraction: float = 0.4,
+    per_study_mb: float = _BYTES_PER_STUDY_DEFAULT_MB,
+    fallback_available_gb: float = 13.0,
+    min_studies: int = 200,
+    max_studies: int = 5000,
+) -> int:
+    """Pick a per-worker cache size from *actually available* memory instead of a
+    hardcoded guess. Increasing num_workers alone already multiplies worst-case cache
+    memory (each worker's cache is independent -- see DEFAULT_MAX_CACHE_STUDIES's
+    docstring), so a bigger cache budget must divide by num_workers, not just scale up.
+
+    Only spends `target_fraction` of available memory on the cache (default 40%),
+    leaving headroom for the model, activations, and everything else sharing the same
+    process. Falls back to `fallback_available_gb` if the actual available memory
+    can't be read (e.g. `psutil` not installed) rather than guessing something
+    larger and risking OOM.
+    """
+    try:
+        import psutil
+
+        available_gb = psutil.virtual_memory().available / 1024**3
+    except Exception:
+        available_gb = fallback_available_gb
+
+    budget_mb = available_gb * 1024 * target_fraction
+    per_worker_studies = int(budget_mb / per_study_mb / max(num_workers, 1))
+    return max(min_studies, min(max_studies, per_worker_studies))
+
 
 class StudyDataset(Dataset):
     def __init__(

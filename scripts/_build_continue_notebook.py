@@ -77,7 +77,7 @@ import torch
 from rsna_knee.data.series import assign_slots
 from rsna_knee.data.label_expansion import add_derived_confidence, build_training_targets
 from rsna_knee.data.labels import load_train_labels
-from rsna_knee.datasets import StudyDataset
+from rsna_knee.datasets import StudyDataset, compute_safe_max_cache_studies
 from rsna_knee.metrics import LABEL_COLUMNS, per_label_auc
 from rsna_knee.models.vision import KneeMultiLabelModel
 from rsna_knee.train import train_one_epoch
@@ -130,9 +130,14 @@ train_series_dir = COMPETITION_ROOT / 'train_series'
 train_series_subset = train_series_csv[train_series_csv['StudyInstanceUID'].isin(train_ids)]
 train_series_with_slots = assign_slots(train_series_subset, train_series_dir)
 
-train_dataset = StudyDataset(train_ids, train_series_with_slots, train_series_dir, targets)
+NUM_WORKERS = 4
+max_cache_studies = compute_safe_max_cache_studies(NUM_WORKERS)
+print(f'max_cache_studies per worker: {max_cache_studies}')
+train_dataset = StudyDataset(
+    train_ids, train_series_with_slots, train_series_dir, targets, max_cache_studies=max_cache_studies
+)
 train_loader = torch.utils.data.DataLoader(
-    train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, persistent_workers=True
+    train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, persistent_workers=True
 )
 print('train dataset size:', len(train_dataset))
 """,

@@ -1,10 +1,12 @@
-from unittest.mock import patch
+import sys
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from rsna_knee.data.dicom_io import SERIES_SLOTS
-from rsna_knee.datasets import StudyDataset
+from rsna_knee.datasets import StudyDataset, compute_safe_max_cache_studies
 from rsna_knee.metrics import LABEL_COLUMNS
 
 
@@ -171,3 +173,48 @@ def test_center_fraction_passed_through_to_load_series_representative():
         dataset[0]
 
     assert mock_load.call_args.kwargs["center_fraction"] == 0.35
+
+
+def _with_fake_psutil(available_gb: float):
+    """Context manager that makes `import psutil` inside compute_safe_max_cache_studies
+    succeed and report a specific available-memory value, without needing psutil
+    actually installed (it isn't, in this dev environment)."""
+    fake_psutil = MagicMock()
+    fake_psutil.virtual_memory.return_value = MagicMock(available=available_gb * 1024**3)
+    return patch.dict(sys.modules, {"psutil": fake_psutil})
+
+
+def test_compute_safe_cache_falls_back_when_psutil_unavailable():
+    with patch.dict(sys.modules, {"psutil": None}):
+        result = compute_safe_max_cache_studies(num_workers=2, fallback_available_gb=13.0)
+    # should use the fallback, not raise -- exact value covered by the psutil-present
+    # test below (same formula), this just checks the no-psutil path doesn't crash
+    assert isinstance(result, int)
+    assert result > 0
+
+
+def test_compute_safe_cache_uses_real_available_memory_when_psutil_present():
+    with _with_fake_psutil(available_gb=20.0):
+        result = compute_safe_max_cache_studies(num_workers=2, target_fraction=0.4, per_study_mb=2.0)
+    # 20GB * 1024 * 0.4 / 2.0MB / 2 workers = 2048 studies
+    assert result == 2048
+
+
+def test_compute_safe_cache_more_workers_gives_smaller_per_worker_budget():
+    with _with_fake_psutil(available_gb=20.0):
+        cache_1_worker = compute_safe_max_cache_studies(num_workers=1, per_study_mb=2.0)
+        cache_4_workers = compute_safe_max_cache_studies(num_workers=4, per_study_mb=2.0)
+    # more workers -> each worker's independent cache must shrink to keep the same
+    # total memory budget, per the docstring's whole rationale
+    assert cache_4_workers < cache_1_worker
+    assert cache_1_worker == pytest.approx(cache_4_workers * 4, rel=0.01)
+
+
+def test_compute_safe_cache_clamps_to_min_and_max():
+    with _with_fake_psutil(available_gb=0.001):  # essentially no memory available
+        result = compute_safe_max_cache_studies(num_workers=2, min_studies=200, max_studies=5000)
+    assert result == 200
+
+    with _with_fake_psutil(available_gb=10000.0):  # implausibly huge
+        result = compute_safe_max_cache_studies(num_workers=1, min_studies=200, max_studies=5000)
+    assert result == 5000
