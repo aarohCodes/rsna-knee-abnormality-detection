@@ -251,14 +251,21 @@ didn't. Not yet submitted to competition -- ready to.
    Raw slot-coverage data: `train_series_with_slots.csv` in
    `data/interim/kernel_output_slot_coverage_v1/`.
 
-   **Side experiment, IN PROGRESS**: pushed `rsna-knee-base-continue-lrdecay`
-   -- resumes base v2 for +3 epochs like v3 did, but with ENCODER_LR/HEAD_LR
-   halved (5e-6/5e-4 vs the standard 1e-5/1e-3) to test whether a lower rate
-   avoids v3's overfitting collapse (tier1 0.7931->0.7715, real 0.812->0.790)
-   while still extracting benefit from more epochs. Single-variable change
-   vs v3 (same resume-from-v2 methodology, only LR differs), so this is a
-   clean test, unlike the fallback comparison's fresh-vs-continued confound.
-   Reference to beat: base v2 tier1=0.7931/real=0.812. Waiting on results.
+   **Side experiment, RESULT: also negative, don't submit or pursue.**
+   `rsna-knee-base-continue-lrdecay` (base v2 +3ep, ENCODER_LR/HEAD_LR halved
+   to 5e-6/5e-4) scored tier1=0.7688, tier2=0.7093 -- WORSE than v2 (0.7931/
+   0.7774) and even slightly worse than v3's full-LR overfit (0.7715/0.7496).
+   Notably, final training loss (0.2970) landed almost identical to v3's
+   (0.2987) despite the 2x smaller LR -- the learning rate barely changed the
+   training trajectory at all. This suggests the overfitting isn't primarily
+   a step-size problem; it's tied to total epoch exposure to the noisy
+   silver labels, largely independent of LR in the range tested. **Base v2
+   (6 epochs, tier1=0.7931, real=0.812) looks like a genuine, LR-insensitive
+   ceiling for this training recipe.** Don't keep trying small LR/epoch
+   variations around v2 -- two independent attempts (fallback, LR-decay)
+   both failed to beat it. A different lever (item 6, or a genuinely
+   different architecture/data change) is needed for further gains, not
+   more tweaking of this recipe.
 6. Multi-slice/volumetric input instead of one representative crop per series --
    NOT YET STARTED. Biggest remaining lever (only ~18% of each study's files
    are currently used) but also the highest-effort/highest-risk item (new
