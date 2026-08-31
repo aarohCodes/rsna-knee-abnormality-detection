@@ -36,6 +36,18 @@ SERIES_SLOTS = [
     "SAG_T1",
 ]
 
+# A full-corpus DICOM header scan (see STATUS.md roadmap item 5) found COR_T1 present
+# in only ~48% of studies -- and the gap isn't selective between MCL-positive and
+# MCL-negative studies, so it's a systemic data-coverage bottleneck, not a labeling
+# artifact. COR_FLUID_FS (91% coverage) is the next-best coronal view when COR_T1 is
+# absent: different contrast weighting, but still real coronal anatomy, which is
+# better than feeding the model no coronal view at all for roughly half the corpus.
+# Only COR_T1 has a fallback -- other slots' coverage (88-91% for the FLUID_FS slots)
+# doesn't show the same gap, so a fallback there is unvalidated and not added.
+SLOT_FALLBACKS: dict[str, str] = {
+    "COR_T1": "COR_FLUID_FS",
+}
+
 _MIDLINE_UNRESOLVED_BAND_MM = 15.0
 
 

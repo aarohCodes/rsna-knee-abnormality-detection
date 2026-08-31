@@ -13,7 +13,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from rsna_knee.data.dicom_io import SERIES_SLOTS, load_series_representative
+from rsna_knee.data.dicom_io import SERIES_SLOTS, SLOT_FALLBACKS, load_series_representative
 from rsna_knee.data.preprocess import DEFAULT_PHYSICAL_CROP_MM, DEFAULT_RESIZE_PX
 from rsna_knee.metrics import LABEL_COLUMNS
 
@@ -111,6 +111,14 @@ class StudyDataset(Dataset):
 
         for slot_idx, slot in enumerate(SERIES_SLOTS):
             matches = series_rows[series_rows["slot"] == slot]
+            if matches.empty and slot in SLOT_FALLBACKS:
+                # See SLOT_FALLBACKS' docstring: COR_T1 is missing in ~52% of studies,
+                # non-selectively, so substituting the next-best coronal view beats
+                # leaving this slot position all-zero/masked-out. If the fallback slot
+                # (e.g. COR_FLUID_FS) is itself present as its own slot too, its image
+                # is intentionally reused here -- duplicated coronal signal is still
+                # strictly more informative than none.
+                matches = series_rows[series_rows["slot"] == SLOT_FALLBACKS[slot]]
             if matches.empty:
                 continue
             series_dir = self.series_root / study_id / matches.iloc[0]["SeriesInstanceUID"]

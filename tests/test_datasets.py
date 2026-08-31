@@ -218,3 +218,73 @@ def test_compute_safe_cache_clamps_to_min_and_max():
     with _with_fake_psutil(available_gb=10000.0):  # implausibly huge
         result = compute_safe_max_cache_studies(num_workers=1, min_studies=200, max_studies=5000)
     assert result == 5000
+
+
+def _multi_slot_series(study_id: str, slots: list[str]):
+    return pd.DataFrame(
+        {
+            "StudyInstanceUID": [study_id] * len(slots),
+            "SeriesInstanceUID": [f"series_{i}" for i in range(len(slots))],
+            "slot": slots,
+        }
+    )
+
+
+def test_missing_cor_t1_falls_back_to_cor_fluid_fs():
+    study_id = "study_1"
+    # COR_T1 absent, COR_FLUID_FS present -- per SLOT_FALLBACKS, COR_T1's slot
+    # position should still get filled (from COR_FLUID_FS) rather than left masked.
+    series_df = _multi_slot_series(study_id, ["COR_FLUID_FS"])
+    targets = _targets(study_id)
+    dataset = StudyDataset([study_id], series_df, series_root="fake_root", targets=targets, cache_images=False)
+
+    fake_image = np.full((dataset.resize_px, dataset.resize_px), 0.7, dtype=np.float32)
+    with patch("rsna_knee.datasets.load_series_representative", return_value=fake_image):
+        item = dataset[0]
+
+    cor_t1_idx = SERIES_SLOTS.index("COR_T1")
+    cor_fluid_fs_idx = SERIES_SLOTS.index("COR_FLUID_FS")
+    assert item["presence_mask"][cor_t1_idx] == 1.0
+    assert item["presence_mask"][cor_fluid_fs_idx] == 1.0
+    # both slots carry real image content, not a zeroed-out placeholder
+    assert item["images"][cor_t1_idx].max() > 0
+    assert item["images"][cor_fluid_fs_idx].max() > 0
+
+
+def test_missing_cor_t1_with_no_fallback_available_stays_masked():
+    study_id = "study_1"
+    # Neither COR_T1 nor its fallback (COR_FLUID_FS) present -- should stay masked,
+    # same as any other genuinely-absent slot.
+    series_df = _multi_slot_series(study_id, ["SAG_T1"])
+    targets = _targets(study_id)
+    dataset = StudyDataset([study_id], series_df, series_root="fake_root", targets=targets, cache_images=False)
+
+    fake_image = np.full((dataset.resize_px, dataset.resize_px), 0.7, dtype=np.float32)
+    with patch("rsna_knee.datasets.load_series_representative", return_value=fake_image):
+        item = dataset[0]
+
+    cor_t1_idx = SERIES_SLOTS.index("COR_T1")
+    assert item["presence_mask"][cor_t1_idx] == 0.0
+    assert item["images"][cor_t1_idx].max() == 0
+
+
+def test_present_cor_t1_is_not_overridden_by_fallback():
+    study_id = "study_1"
+    # Both COR_T1 and COR_FLUID_FS present -- COR_T1's own series must be used, not
+    # silently replaced by the fallback.
+    series_df = _multi_slot_series(study_id, ["COR_T1", "COR_FLUID_FS"])
+    targets = _targets(study_id)
+    dataset = StudyDataset([study_id], series_df, series_root="fake_root", targets=targets, cache_images=False)
+
+    calls = []
+
+    def fake_load(series_dir, *args, **kwargs):
+        calls.append(str(series_dir))
+        return np.full((dataset.resize_px, dataset.resize_px), 0.7, dtype=np.float32)
+
+    with patch("rsna_knee.datasets.load_series_representative", side_effect=fake_load):
+        dataset[0]
+
+    # the COR_T1 row's own series (series_0) must be the one used for that slot, not
+    # COR_FLUID_FS's series_1
+    assert any("series_0" in c for c in calls)
