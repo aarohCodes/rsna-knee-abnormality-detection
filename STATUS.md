@@ -32,13 +32,22 @@ current public scores could shift either direction at that point.
 
 ## Score trajectory (public leaderboard)
 0.596 -> 0.617 -> 0.646 (random-init ResNet18 baselines, v0) -> **0.782** (DINOv2-
-small, 6 epochs, TTA). Current visible competition leader: ~0.952 (public LB,
-snapshot from early in the competition -- may have moved since). A submission from
-the 9-epoch/v4-or-ensemble run is still PENDING scoring as of this writing.
+small, 6 epochs, TTA, our best real score so far) -> **0.775** (v13+v3+v4 rank
+ensemble -- REGRESSION, confirmed, see below). Current visible competition leader:
+~0.952 (public LB, snapshot from early in the competition -- may have moved since).
 
-**Locally-validated holdout AUC has matched real public LB scores almost exactly**
-(0.7833 predicted vs 0.782 actual) -- trust the tier-1 holdout number below as a
-reliable proxy before spending a submission on something.
+All 5 submissions on 2026-08-30 (UTC) are used; the daily cap resets per UTC day,
+so a fresh 5 became available starting 2026-08-31 00:00 UTC.
+
+**Locally-validated holdout AUC has matched real public LB scores closely once**
+(0.7833 predicted vs 0.782 actual) **but missed badly the second time**: the
+ensemble's tier1 (0.7911, predicted best-yet) scored *worse* in reality (0.775)
+than the plain 6-epoch single model (0.782). Two data points now, not one --
+treat this as a real signal that tier1 (silver-label holdout) can diverge from
+true generalization, not just as one-off public-LB sampling noise. Don't fully
+trust tier1 deltas between closely-matched checkpoints/ensembles without a real
+submission to confirm; still fine as a first-pass filter for clearly-better vs
+clearly-worse.
 
 ## Holdout AUC leaderboard (tier1 = vs silver labels, n=871, reliable; tier2 = vs
 ## gold labels, n=11, noisy -- report only, don't tune on it)
