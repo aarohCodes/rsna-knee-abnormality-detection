@@ -31,23 +31,30 @@ current public scores could shift either direction at that point.
   without asking again first.
 
 ## Score trajectory (public leaderboard)
-0.596 -> 0.617 -> 0.646 (random-init ResNet18 baselines, v0) -> **0.782** (DINOv2-
-small, 6 epochs, TTA, our best real score so far) -> **0.775** (v13+v3+v4 rank
-ensemble -- REGRESSION, confirmed, see below). Current visible competition leader:
-~0.952 (public LB, snapshot from early in the competition -- may have moved since).
+0.596 -> 0.617 -> 0.646 (random-init ResNet18 baselines, v0) -> 0.782 (DINOv2-small,
+6 epochs, TTA) -> 0.775 (v13+v3+v4 rank ensemble -- REGRESSION vs the 0.782 single
+model) -> 0.790 (base v3, 9ep, submitted 2026-08-31 04:09 UTC) -> **0.812** (base v2,
+6ep, submitted 2026-08-31 02:40 UTC -- our new best real score). Current visible
+competition leader: ~0.952 (public LB, snapshot from early in the competition -- may
+have moved since).
 
-All 5 submissions on 2026-08-30 (UTC) are used; the daily cap resets per UTC day,
-so a fresh 5 became available starting 2026-08-31 00:00 UTC.
+All 5 submissions on 2026-08-30 (UTC) were used; 2 of the fresh 5 for 2026-08-31 are
+now used (base v2, base v3), 3 remain today.
 
-**Locally-validated holdout AUC has matched real public LB scores closely once**
-(0.7833 predicted vs 0.782 actual) **but missed badly the second time**: the
-ensemble's tier1 (0.7911, predicted best-yet) scored *worse* in reality (0.775)
-than the plain 6-epoch single model (0.782). Two data points now, not one --
-treat this as a real signal that tier1 (silver-label holdout) can diverge from
-true generalization, not just as one-off public-LB sampling noise. Don't fully
-trust tier1 deltas between closely-matched checkpoints/ensembles without a real
-submission to confirm; still fine as a first-pass filter for clearly-better vs
-clearly-worse.
+**Tier1 (silver-label holdout) tracking vs real score, all data points so far:**
+- small v13->v3 (single model, +3ep): predicted 0.7833, actual 0.782 -- close match.
+- small ensemble (v13+v3+v4): predicted 0.7911 (best-yet), actual 0.775 -- WORSE
+  than the plain 6-epoch model's 0.782, despite a higher predicted tier1. Ensembling
+  correlated checkpoints is the one case where tier1 has actively misled us.
+- base v2->v3 (single model, +3ep): predicted DROP (0.7931->0.7715), actual DROP
+  confirmed (0.812->0.790) -- direction matched, though both absolute real scores
+  came in ~0.02 HIGHER than tier1 predicted (opposite bias from the ensemble case).
+  **Refined lesson**: for single-model epoch-scaling comparisons specifically, tier1's
+  RELATIVE ranking has now held up correctly twice (small v13->v3, base v2->v3),
+  even though absolute values drift either direction. The one confirmed failure mode
+  remains specifically ensembling correlated checkpoints together -- keep trusting
+  tier1 deltas for single-model epoch decisions, keep verifying ensembles with a
+  real submission before trusting them.
 
 ## Holdout AUC leaderboard (tier1 = vs silver labels, n=871, reliable; tier2 = vs
 ## gold labels, n=11, noisy -- report only, don't tune on it)
