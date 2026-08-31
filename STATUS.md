@@ -392,6 +392,12 @@ didn't. Not yet submitted to competition -- ready to.
    nothing is at risk from this block, just further testing is paused.
    Reference to beat: v2's tier1=0.7931/real=0.812.
 
+   **Pre-flight check done while blocked (no GPU cost)**: re-verified the
+   queued notebook during the wait -- correctly isolates K=3 as the only
+   variable vs v2's own recipe, `rsna-knee-src` still fully in sync with
+   local code (no drift since last push), full test suite 102/102 passing.
+   No issues found; genuinely ready to fire the moment quota resets.
+
 Explicitly deferred / do not start without asking again: external MRI datasets
 (MRNet/OAI) and RadImageNet-style domain-specific pretrained backbones.
 
