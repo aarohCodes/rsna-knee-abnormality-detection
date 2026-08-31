@@ -212,13 +212,22 @@ didn't. Not yet submitted to competition -- ready to.
    partly explain other mid-weak labels too (PF OA, Baker's) if they lean
    on T1 views.
 
-   **Actionable fix identified, not yet implemented**: currently a missing
-   COR_T1 leaves that slot empty/masked rather than substituting the
-   next-best coronal series (COR_FLUID_FS, 91% coverage) -- so ~52% of
-   studies get zero coronal signal at all instead of a degraded-but-useful
-   one. A coronal fallback (use COR_FLUID_FS when COR_T1 is absent) is a
-   scoped, cheap change worth trying before/alongside item 6. Raw data:
-   `train_series_with_slots.csv` downloaded to
+   **Fix IMPLEMENTED and being tested.** Added `SLOT_FALLBACKS = {"COR_T1":
+   "COR_FLUID_FS"}` in `data/dicom_io.py`; `datasets.py`'s
+   `_load_images_and_mask` substitutes the fallback slot's series when a
+   study's own COR_T1 is absent (still masked=0 if neither is present).
+   Verified against real local DICOM data (not just mocks) -- a real study
+   missing COR_T1 now gets a real decoded image + mask=1 via the fallback.
+   3 new tests added, full suite 90/90 passing. Synced to `rsna-knee-src`
+   (remember `--dir-mode zip` or the folder silently gets skipped -- caught
+   this once already today).
+
+   Pushed `rsna-knee-base-fallback`: trains FRESH from pretrained DINOv2-
+   base (not continued from v2, to avoid confounding with the overfitting-
+   at-9-epochs issue v3 already showed) for 6 epochs -- matching base v2's
+   epoch count for a clean, direct comparison. Reference to beat: base v2
+   tier1=0.7931 macro, MCL alone=0.663. Waiting on results.
+   Raw slot-coverage data: `train_series_with_slots.csv` in
    `data/interim/kernel_output_slot_coverage_v1/`.
 6. Multi-slice/volumetric input instead of one representative crop per series
 
