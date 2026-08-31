@@ -247,10 +247,25 @@ didn't. Not yet submitted to competition -- ready to.
    but the fix attempted didn't pan out. Don't revisit without either a
    properly controlled ablation (same continuous-training methodology on
    both sides) or a redesigned fallback that distinguishes substituted from
-   genuine content. Moving on to item 6.
+   genuine content.
    Raw slot-coverage data: `train_series_with_slots.csv` in
    `data/interim/kernel_output_slot_coverage_v1/`.
-6. Multi-slice/volumetric input instead of one representative crop per series
+
+   **Side experiment, IN PROGRESS**: pushed `rsna-knee-base-continue-lrdecay`
+   -- resumes base v2 for +3 epochs like v3 did, but with ENCODER_LR/HEAD_LR
+   halved (5e-6/5e-4 vs the standard 1e-5/1e-3) to test whether a lower rate
+   avoids v3's overfitting collapse (tier1 0.7931->0.7715, real 0.812->0.790)
+   while still extracting benefit from more epochs. Single-variable change
+   vs v3 (same resume-from-v2 methodology, only LR differs), so this is a
+   clean test, unlike the fallback comparison's fresh-vs-continued confound.
+   Reference to beat: base v2 tier1=0.7931/real=0.812. Waiting on results.
+6. Multi-slice/volumetric input instead of one representative crop per series --
+   NOT YET STARTED. Biggest remaining lever (only ~18% of each study's files
+   are currently used) but also the highest-effort/highest-risk item (new
+   architecture needed for slice-level aggregation, real risk of blowing the
+   9-hour runtime cap at inference on ~1300 test studies). Explicitly flagged
+   to the user as needing their buy-in before starting -- do not begin
+   implementation without an explicit go-ahead in the conversation itself.
 
 Explicitly deferred / do not start without asking again: external MRI datasets
 (MRNet/OAI) and RadImageNet-style domain-specific pretrained backbones.
