@@ -167,10 +167,27 @@ didn't. Not yet submitted to competition -- ready to.
    Conclusion: steven's `llm_labels_v4_blend.csv` remains the sole silver
    source. Don't revisit this item without a genuinely new, independently-
    verified-stronger candidate -- weaker sources measurably hurt when blended.
-5. Investigate weak labels specifically -- Lateral OA, MCL, Baker's have shown up
-   weakest across holdout runs (check `data/interim/kernel_output_*/`.log files
-   for exact per-label numbers); figure out if it's class imbalance or genuinely
-   harder signal, and address accordingly
+5. **Investigate weak labels -- IN PROGRESS.** Aggregated per-label tier1 AUC
+   across all 6 real training runs (small v13/v3/v4, base v1/v2/v3) -- mean
+   per label, sorted worst to best:
+   MCL 0.666, Lateral Meniscus 0.730, Baker's 0.752, Medial Meniscus 0.768,
+   PF OA 0.770, Lateral OA 0.782, ACL 0.788, Effusion 0.800, Contusion 0.802,
+   Medial OA 0.819, Fracture 0.832, Synovitis 0.876.
+   **MCL and Lateral Meniscus are consistently weakest by a wide margin, in
+   every single run** -- correcting the earlier guess (Lateral OA, MCL,
+   Baker's) which wasn't rigorous. Ruled out simple class imbalance as the
+   explanation: Fracture (7.2% silver prevalence, 18/58 gold) and Synovitis
+   (12.6% prevalence, 27/58 gold) are similarly-or-more rare yet score much
+   higher (0.832, 0.876) -- rarity alone doesn't predict weakness.
+   Every training study has >=1 raw Coronal-plane series (100% coverage,
+   confirmed from train_series.csv), so if there's a data-coverage gap it
+   must be in whether that series classifies into the COR_T1 slot
+   specifically (MCL is normally read off coronal T1) -- needs real DICOM
+   headers to check, not available in the small local sample. Pushed
+   `rsna-knee-slot-coverage-diagnostic` (CPU-only, no GPU, no training --
+   just reads one DICOM header per series across all 24,371 training series
+   and tabulates slot coverage, cross-tabulated against MCL-positive vs
+   MCL-negative gold studies). Waiting on results.
 6. Multi-slice/volumetric input instead of one representative crop per series
 
 Explicitly deferred / do not start without asking again: external MRI datasets
