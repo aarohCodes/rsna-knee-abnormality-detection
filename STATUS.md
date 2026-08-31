@@ -145,9 +145,28 @@ didn't. Not yet submitted to competition -- ready to.
    or ensembling base checkpoints (v2+v3 ensembling isn't obviously safe
    either, since v3 is a worse, overfit checkpoint -- would need a real
    submission to check, not just assumed from tier1, per the item-2 lesson).
-4. Combine multiple independent silver-label sources (rank-average `steven`'s
-   labels with another *verified-not-leaked* public source) to push past the
-   ~0.89 AUC ceiling any single silver source has against gold
+4. **Combine multiple independent silver-label sources -- INVESTIGATED, no
+   viable improvement found.** Checked two candidates against our 58 gold
+   studies (same leakage-check methodology as before):
+   - `pilkwang/rsna-knee-llm-labels` (CC0): legitimately independent (LLM
+     reads Report text only, confirmed via its `api_labeler.py` source --
+     no gold access), 79.5% cellwise agreement with gold (not suspicious).
+     But weaker alone (0.87 vs steven's 0.8932), and every combination
+     strategy tried (confidence-weighted average, max-confidence-wins,
+     steven-primary/pilkwang-backfill at 3 thresholds) scored BELOW steven
+     alone (best blend: 0.8893). Diluting steven with a weaker source hurts,
+     it doesn't help.
+   - `rayanbabur/rsna-knee-2026-calibrated-soft-targets` (CC0): **REJECTED**.
+     Its shipped `train_targets_soft.csv` exactly copies real gold labels
+     for all 58 gold studies (696/696 cells, 100% match) -- same
+     disqualifying pattern as the two datasets rejected earlier. Its
+     self-reported "0.8991 gold AUC" is not reproducible against the file
+     actually shipped (100% match would trivially score ~1.0, not 0.8991,
+     so the report describes something other than what's in the zip) and
+     can't be independently trusted.
+   Conclusion: steven's `llm_labels_v4_blend.csv` remains the sole silver
+   source. Don't revisit this item without a genuinely new, independently-
+   verified-stronger candidate -- weaker sources measurably hurt when blended.
 5. Investigate weak labels specifically -- Lateral OA, MCL, Baker's have shown up
    weakest across holdout runs (check `data/interim/kernel_output_*/`.log files
    for exact per-label numbers); figure out if it's class imbalance or genuinely
