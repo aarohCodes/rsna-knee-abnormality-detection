@@ -1,20 +1,27 @@
-# Status (last updated 2026-08-31)
+# Status (last updated 2026-09-05)
 
 Read this file first in any new session/after context compaction to get oriented.
 Full strategy/reasoning is in PLAN.md; this file is the living "where are we now."
+Full commit history is also mirrored to a private GitHub repo:
+https://github.com/aarohCodes/rsna-knee-abnormality-detection (private -- kept
+private deliberately while the competition is active, per the rules requiring
+code disclosure only if we win).
 
-## ACTIVE BLOCKER: Kaggle weekly GPU quota exhausted (30h/week)
-As of 2026-08-31, `kernels push` for a GPU kernel fails with "Maximum weekly GPU
-quota of 30.00 hours reached." No GPU kernels can run until this resets.
-**Confirmed exact reset time via `kaggle quota` (a real CLI command, discovered
-2026-08-31 -- use this directly instead of guessing or asking the user to check
-manually next time): GPU refreshAt = 2026-09-05T00:00:00.** TPU quota is
-completely unused (20h available) if ever worth targeting. **CPU-only kernels
-(`enable_gpu: false`) are unaffected** -- confirmed working today (slot-coverage
-and slice-count diagnostics both ran fine under this same quota exhaustion).
-Base v2 (real score 0.812) is our
-best checkpoint and is already submitted -- nothing is at risk, GPU-dependent work
-is just paused until quota resets. See roadmap item 6 for the queued next GPU run.
+## RESOLVED: GPU quota reset on schedule (2026-09-05T00:00:00)
+The prior blocker (weekly 30h GPU quota exhausted 2026-08-31) is over. Confirmed
+by successfully pushing `rsna-knee-base-multislice-fresh` today. Two things now
+in flight, both being watched in background:
+1. **Resubmission of the ORIGINAL multi-slice kernel** (`rsna-knee-base-
+   multislice`, unchanged) to test whether its earlier 0.5 real score was caused
+   by GPU-quota exhaustion during scoring (our leading hypothesis) vs a genuine
+   bug in the new multi-slice code. If it now scores ~0.78-0.80 (matching
+   tier1=0.7793's expected range), that confirms quota was the cause and the
+   code is fine. If it scores 0.5 again, that means a real bug needs
+   debugging before trusting any multi-slice result -- don't skip this check.
+2. **`rsna-knee-base-multislice-fresh`** (K=3, 6 epochs, fresh from pretrained
+   DINOv2-base, matching v2's own epoch budget) -- the decisive test of
+   whether multi-slice input helps at all. Estimated ~5h45m. Reference to
+   beat: v2's tier1=0.7931/real=0.812.
 
 ## Competition
 RSNA Knee Abnormality Detection (Kaggle, slug `rsna-knee-abnormality-detection`).
