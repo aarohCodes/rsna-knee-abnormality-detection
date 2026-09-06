@@ -18,7 +18,11 @@
     "mattiaangeli/rsna-knee-coat-resgated-ep10-top3",
     "renta0426/rsna-knee-public0033-meniscus-bag-v1"
   ],
+  "model_sources": [
+    "metaresearch/dinov2/PyTorch/small/1"
+  ],
   "competition_sources": [
     "rsna-knee-abnormality-detection"
-  ]
+  ],
+  "kernel_sources": []
 }
