@@ -452,6 +452,58 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## PER-LABEL BLEND: ALSO NIL (2026-09-06). Our contribution path is CLOSED.
+
+Free offline search (all prediction files cached locally, zero GPU): per-label
+blend weights of our clean member into `e10_v2`, the strongest ensemble variant.
+
+Result: **1 of 12 labels improves, by +0.0003** (Synovitis, w=0.08). Macro
+unchanged at 0.9202. And those weights were fitted ON the same holdout used to
+score them, so even that is an optimistic upper bound.
+
+**That is three independent tests, all negative:**
+1. global rank blending -- monotonically harmful at every weight
+2. clean retrain on their split -- our member 0.7735 vs their 0.9178
+3. per-label blending -- +0.0003 on one label, fitted optimistically
+
+**STOP TESTING THIS.** Our own modelling contributes nothing to this ensemble. Do
+not train another member, do not try another blending scheme, do not revisit.
+
+## WHERE THINGS ACTUALLY STAND (honest summary, 2026-09-06)
+
+Everything measured on 881 studies no scored model trained on:
+
+| | clean macro AUC |
+|---|---|
+| our best clean member | 0.7735 |
+| their DINOv3 component | 0.9178 |
+| full 24-member ensemble (default submission.csv) | 0.9194 |
+| **best variant: `submission_e10_v2.csv`** | **0.9202** |
+
+Levers tried and their honest value:
+- our own member, any blending scheme: **0.000**
+- ensemble breadth, 1 component -> 24 members + RadImageNet: **+0.0016**
+- blend weight tuning: **0.000**
+- combining silver label sources (tested earlier): **negative**
+
+**The only free win found: `e10_v2` beats the default `submission.csv` by
++0.0008 on clean data.** Small, but it was found by honest validation rather than
+public-LB guessing, which is the one discipline that has actually paid here.
+
+**Untested and plausibly the real ceiling: LABEL QUALITY.** Every model in this
+competition, theirs and ours, trains on silver labels that agree with gold at only
+~0.8932. Their DINOv3 member scores 0.9178 vs silver but only ~0.8931 vs gold
+(n=11, far too noisy to rely on). If the true bound is the label source rather
+than the architecture, then no amount of ensembling moves it -- which is
+consistent with 24 members buying +0.0016. Nobody in the fork-race is working on
+this. A clean test would train holding out ALL 58 gold studies and evaluate
+against them (n=58 rather than n=11), which is one ~3h run.
+
+**Operational risk that deserves real attention:** two of our submissions scored
+0.500 because the pipeline silently fell back to the all-0.5 file. Whatever we
+submit finally MUST be verified to actually produce real predictions on the true
+test set. That is worth more than any remaining marginal modelling gain.
+
 ## FULL ENSEMBLE MEASURED ON CLEAN DATA (2026-09-06) -- +0.0016 over one component
 
 `rsna-knee-full-eval` v2. Redirected BOTH of their pipeline roots (ROOT for the
