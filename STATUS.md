@@ -452,6 +452,38 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## BLEND TEST RESULT (2026-09-06): our member helps, but the number is confounded
+
+`rsna-knee-blend-test` v3, all on the 881-study clean holdout, vs silver:
+
+| | macro AUC |
+|---|---|
+| theirs alone (DINOv3 5-fold) | 0.9178 |
+| ours alone (base v2) | 0.8854 **contaminated** |
+| ours @ 0.05 / 0.10 / 0.15 | 0.9198 / 0.9215 / 0.9227 |
+| **ours @ 0.30 (best)** | **0.9241  (+0.0063)** |
+| ours @ 0.40 / 0.50 | 0.9230 / 0.9204 |
+
+Smooth single-peaked curve at w=0.30, which is what a genuine decorrelation
+benefit looks like rather than noise.
+
+**DO NOT QUOTE +0.0063 AS A CLEAN RESULT.** Base v2 trained on 706 of these 881
+studies (our split differs from theirs), so its 0.8854 solo score is inflated by
+memorisation -- and therefore part of its blend contribution is memorisation too,
+not decorrelation. On genuinely unseen data our member is weaker and the gain may
+shrink toward zero or reverse. The contamination was deliberately built into the
+test and flagged up front; it biases TOWARD finding value, so this is an upper
+bound on the benefit, not a measurement of it.
+
+Also note: 0.9241 is still **below the 0.94 governing target**, even inflated.
+And the 0.9178 baseline is itself pending the per-fold contamination check.
+
+**What this justifies**: training our own member on THEIR split (groups 1-4,
+never touching the 881). That converts a suggestive result into an honest one and
+yields a member legitimately composable with theirs. ~12-15h GPU, now warranted.
+
+Timing datum: our K=1 inference over 881 studies took 21.8 min (theirs took ~12).
+
 ## GOVERNING TARGET (user directive, 2026-09-06): >=0.94 on the CLEAN holdout
 
 User correction, verbatim in intent: **"Dont optimise for ranking, optimise to be
