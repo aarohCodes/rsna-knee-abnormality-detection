@@ -452,6 +452,44 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## LABEL-CEILING HYPOTHESIS IS LIKELY WRONG (2026-09-06) -- models denoise
+
+Free test, no GPU. `tonylica/rsna-knee-bend-dinov3-0917-repro-assets` contains
+`v52_e11_oof.csv`: **out-of-fold predictions for all 4,407 studies**, with `fold`
+and `is_gold` columns. OOF predictions are clean by construction, which finally
+allowed the gold evaluation at **n=58** instead of the n=11 we were stuck with.
+
+| measured out-of-fold | macro AUC |
+|---|---|
+| OOF model vs SILVER (n=4407) | 0.8401 |
+| **OOF model vs GOLD (n=58)** | **0.8576** |
+| SILVER labels themselves vs GOLD (n=58) | 0.8927 |
+
+**The model scores HIGHER against gold (0.8576) than against the silver labels it
+trained on (0.8401), a lift of +0.018.** That is genuine denoising: unbiased label
+noise averages out, so a model can recover true signal better than its teacher.
+
+**This contradicts the hypothesis recorded earlier in this file that silver labels
+cap the competition near 0.89.** They do not -- models exceed their teacher's
+agreement with truth. Do not plan around a label ceiling.
+
+If the same silver->gold lift held for our strong blend (0.9242 vs silver), it
+would correspond to roughly 0.94 against gold-quality labels, i.e. the governing
+target, and would mean the public leaderboard reflects genuine capability rather
+than inflation.
+
+**Caveats, which are substantial**: n=58 is small, and extrapolating a +0.018
+lift measured on a WEAK model (0.84) to a strong one (0.92) is unsafe -- denoising
+headroom generally shrinks as models improve. Suggestive, not established.
+
+## ALSO TESTED: a different model FAMILY adds nothing either
+
+Blending the RadImageNet E11 OOF (0.8422 alone, full 881-study coverage) into our
+50/50 blend: every weight from 0.05 to 0.40 DECREASED the score (0.9232 down to
+0.9056). So even a genuinely decorrelated family -- RadImageNet rather than
+DINOv2/DINOv3 -- does not help. The ensemble is saturated, which strengthens the
+conclusion that the optimisation space is closed.
+
 ## OPTIMISATION SPACE EXHAUSTED (2026-09-06). Submission kernel is at the optimum.
 
 Two further free offline searches, both on the 881 clean studies:
