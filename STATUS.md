@@ -452,6 +452,44 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## SCORE JUMPED TO 0.922 -- and our validation predicted it within 0.003
+
+Submission 56047453 (the verbatim community fork's `submission.csv`) scored
+**0.922** on the public leaderboard, up from our previous best of 0.812.
+
+**Our clean-holdout measurement for that exact file was 0.9194. It scored 0.922.
+Accurate to 0.003.** This substantially resolves the comparability worry recorded
+earlier: despite scoring silver labels on training studies rather than true labels
+on test studies, the 881-study clean holdout is empirically a reliable proxy for
+real test performance. **Trust it to rank candidates before spending submissions.**
+By that mapping, `e10_v2` (0.9202 clean) should score ~0.923.
+
+## THE 0.028 GAP IS NOW THE WHOLE GAME (open question, NOT diagnosed)
+
+Rank 10 is 0.950. We are at 0.922.
+
+**We ran their published notebook verbatim, with the same attached data sources,
+and got 0.922. The author and ~17 forks score 0.949-0.954.** That 0.028 is an
+order of magnitude larger than the 0.001-0.003 fork-race movements the author
+himself describes, so something substantive differs between running their
+published code and their reported result.
+
+Unverified candidate explanations (do NOT treat any as established):
+1. Published-vs-submitted mismatch -- his leaderboard entry may come from a
+   version other than the one currently published. His own cell-0 warning
+   ("use an earlier version as a baseline") hints the published one is the
+   fork-race-tweaked one.
+2. **A missing data source.** Their kernel metadata listed 13 dataset_sources and
+   the FIRST WAS AN EMPTY STRING, which we filtered out when building our fork's
+   metadata. If that was a real dataset mangled in the API response, we may be
+   running without a whole member set. **This is the cheapest lead to check.**
+3. Accumulated public-set fitting across many submissions by those teams.
+
+**Why this matters more than any modelling work**: the gap is a discrepancy
+between their code and their result, which is investigable, rather than a
+capability gap requiring us to out-engineer anyone. Every modelling lever we
+tested is worth <=0.002; this is worth 0.028.
+
 ## PER-LABEL BLEND: ALSO NIL (2026-09-06). Our contribution path is CLOSED.
 
 Free offline search (all prediction files cached locally, zero GPU): per-label
