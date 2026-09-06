@@ -452,6 +452,39 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## PRACTICAL ASSESSMENT: run their notebook, don't reimplement it (2026-09-05)
+
+Their readout IS available: notebook cell 23 defines `TokenXAttnPool`, which
+matches the checkpoint keys exactly (`q (12,384)`, `kv_norm`, MultiheadAttention
+`in_proj_weight (1152,384)`, `slot_emb` with N_SLOT_TYPES+1=7). Cell 23 also has
+`MeanMaxPool`, `LabelAttentionPool`, and a `segment_softmax` over a ragged
+(sidx) layout.
+
+**Worth noting**: the `SliceCrossAttentionHead` written here independently from
+the state_dict shapes came out nearly identical to their `TokenXAttnPool` -- same
+LayerNorm on keys/values, twelve learned per-finding queries, the same
+`nn.MultiheadAttention` with dropout, a slot-type embedding. Converging on their
+design without having read it first is decent evidence the reasoning was sound.
+Theirs has extra machinery ours lacks (`readout.pool.dw (12,384)`, `db (12,)`,
+`gate (12,)` -- some per-label delta/gating mechanism) and uses a ragged segment
+layout rather than a dense (B,S,K) one.
+
+**DECISION -- do NOT reimplement their inference pipeline from scratch.**
+Faithfully reproducing it would require: TokenXAttnPool plus the dw/db/gate
+parts, the `enc.vit`/`enc.tok` wrapper, timm 1.0.22 with
+`vit_small_patch16_dinov3.lvd1689m`, and their exact preprocessing (n_slice=16,
+stem=native, pe_init=tiled, img=336, their slot assignment, their slice
+ordering, uint8/255 scaling). That is a large surface area where **a silent
+mismatch produces plausible-but-wrong numbers** -- precisely the failure mode
+that just cost us a 0.5 submission. Forking and RUNNING their notebook is what
+forking is for; reimplementing it is all of the risk for none of the benefit.
+
+Our added value therefore comes from the three things that are genuinely ours:
+1. our own trained member (now with the corrected cross-attention aggregation),
+2. honest out-of-fold validation on their clean group-0 split (which the rest of
+   the field is not doing -- they validate against the public LB),
+3. final-submission selection discipline driven by (2) rather than public score.
+
 ## PUBLIC DINOv3 MEMBER DISSECTED (2026-09-05) -- and it CORRECTS our item-6 verdict
 
 Downloaded `mattiaangeli/knee-mri-fold-weights` (CC0) and inspected the
