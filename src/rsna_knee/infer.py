@@ -44,10 +44,22 @@ def run_inference(
     # StudyDataset needs a `targets` frame; inference has no real targets, so pass an
     # empty one -- every study falls through to the neutral/zero-weight branch, which
     # is fine since targets/weights aren't used at inference time.
+    #
+    # cache_images=False: caching exists to avoid re-decoding a study across multiple
+    # epochs, but inference makes exactly one pass over each study -- it can never
+    # benefit from the cache, only pay its memory cost. That cost scales with
+    # slices_per_slot (each study's cached array is slices_per_slot times bigger), so
+    # the K=1-calibrated default cache size becomes a real OOM risk at higher K over
+    # a large test set (real hidden test set, ~1,300 studies) even though it never
+    # showed a problem at K=1 or over the smaller 871-study holdout. Found this after
+    # a K=3 submission scored 0.5 (all-constant fallback) on the real test set despite
+    # a healthy tier1 holdout AUC -- this is the most concrete lead, though not
+    # directly confirmed against the actual scoring-run's error output (not
+    # accessible to us). Disabling the cache removes the risk regardless.
     empty_targets = pd.DataFrame({"StudyInstanceUID": []})
     dataset = StudyDataset(
         study_ids, series_with_slots, series_root, empty_targets, center_fraction=center_fraction,
-        slices_per_slot=slices_per_slot,
+        slices_per_slot=slices_per_slot, cache_images=False,
     )
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 

@@ -9,19 +9,35 @@ code disclosure only if we win).
 
 ## RESOLVED: GPU quota reset on schedule (2026-09-05T00:00:00)
 The prior blocker (weekly 30h GPU quota exhausted 2026-08-31) is over. Confirmed
-by successfully pushing `rsna-knee-base-multislice-fresh` today. Two things now
-in flight, both being watched in background:
-1. **Resubmission of the ORIGINAL multi-slice kernel** (`rsna-knee-base-
-   multislice`, unchanged) to test whether its earlier 0.5 real score was caused
-   by GPU-quota exhaustion during scoring (our leading hypothesis) vs a genuine
-   bug in the new multi-slice code. If it now scores ~0.78-0.80 (matching
-   tier1=0.7793's expected range), that confirms quota was the cause and the
-   code is fine. If it scores 0.5 again, that means a real bug needs
-   debugging before trusting any multi-slice result -- don't skip this check.
-2. **`rsna-knee-base-multislice-fresh`** (K=3, 6 epochs, fresh from pretrained
-   DINOv2-base, matching v2's own epoch budget) -- the decisive test of
-   whether multi-slice input helps at all. Estimated ~5h45m. Reference to
-   beat: v2's tier1=0.7931/real=0.812.
+by successfully pushing `rsna-knee-base-multislice-fresh` today.
+
+## RESOLVED: multi-slice's 0.5 score was a real bug, NOT quota exhaustion
+Resubmitted the ORIGINAL `rsna-knee-base-multislice` kernel (unchanged) after
+quota reset specifically to test this. **It scored 0.500 again** -- with quota
+confirmed available, this rules out the quota hypothesis. Found and fixed the
+real bug: `infer.py`'s `run_inference` never passed `cache_images=False` to its
+internally-constructed `StudyDataset`, so it always used the K=1-calibrated
+default cache size (1500 studies) regardless of `slices_per_slot`. At K=3, each
+study's cached array is ~3x bigger (~7.75MB vs ~2.7MB), and with ~1,300 real
+test studies that cache could balloon to ~10.5GB -- a real OOM risk that K=1
+never exposed (and that the 871-study holdout, evaluated in the SAME kernel run,
+apparently didn't hit either, only the larger real test set). Caching is also
+pure downside during inference regardless of K or scale: it exists to avoid
+re-decoding across multiple training epochs, but inference makes exactly one
+pass per study, so it can never pay off, only cost memory. Fixed by passing
+`cache_images=False` unconditionally in `run_inference`. Added a regression
+test (`test_run_inference_disables_image_cache`), full suite 103/103 passing,
+synced to `rsna-knee-src` (remember `--dir-mode zip`).
+
+**Important consequence**: `rsna-knee-base-multislice-fresh` (currently
+running, pushed BEFORE this fix) has the OLD buggy code baked into its
+`rsna-knee-src` snapshot from when it was pushed -- syncing the fix now does
+NOT retroactively help an already-running kernel. Its tier1/tier2 holdout
+numbers will still be valid and useful (holdout apparently doesn't trigger
+this bug, at least not at 871 studies), but **do not trust or submit its
+actual test-set submission.csv without first re-pushing with the fix and
+re-running**, even if tier1 looks great. Treat this run as informative for
+the "does multi-slice help" question, not as a candidate to submit as-is.
 
 ## Competition
 RSNA Knee Abnormality Detection (Kaggle, slug `rsna-knee-abnormality-detection`).

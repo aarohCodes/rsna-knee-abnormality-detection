@@ -125,3 +125,22 @@ def test_run_inference_tta_combines_varying_predictions_by_rank():
     preds = preds.set_index("StudyInstanceUID")
     for col in LABEL_COLUMNS:
         assert preds.loc["a", col] > preds.loc["b", col] > preds.loc["c", col]
+
+
+def test_run_inference_disables_image_cache():
+    """Inference makes exactly one pass over each study, so it can never benefit
+    from StudyDataset's cache -- only pay its memory cost, which scales with
+    slices_per_slot and becomes a real OOM risk at higher K over a large test set
+    (found after a K=3 real submission scored 0.5, an all-constant-fallback score,
+    likely from exactly this). run_inference must construct its dataset with
+    cache_images=False regardless of slices_per_slot."""
+    study_ids = ["a"]
+    series_with_slots = _series_with_slots(study_ids)
+    model = _MeanPoolingModel()
+
+    fake_image = np.full((336, 336), 0.5, dtype=np.float32)
+    with patch("rsna_knee.datasets.load_series_representative", return_value=fake_image), \
+         patch("rsna_knee.infer.StudyDataset", wraps=__import__("rsna_knee.datasets", fromlist=["StudyDataset"]).StudyDataset) as mock_dataset:
+        run_inference(model, study_ids, series_with_slots, series_root="fake_root", device="cpu")
+
+    assert mock_dataset.call_args.kwargs.get("cache_images") is False
