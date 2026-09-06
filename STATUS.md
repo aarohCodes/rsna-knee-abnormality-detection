@@ -452,6 +452,42 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## COMMUNITY BASELINE FORK RUNS CLEANLY IN OUR ACCOUNT (2026-09-05)
+
+`aarohnanoti/rsna-knee-community-baseline` (verbatim fork, all 12 public dataset
+sources reproduced) pushed and COMPLETED with no errors. It ran fast only
+because dev-time `test.csv` is the 3-row placeholder; real cost lands at scoring.
+
+What loaded and verified:
+- **24 ensemble members** banked: 20 from `pilkwang/rsna-knee-weights` + 4 legacy
+  folds (accepted at reduced weight, they carry no stored fingerprint).
+- **All 5 DINOv3 folds** loaded: `vit_small_patch16_dinov3.lvd1689m pool=xcodex`.
+- Two decode groups: 336px x 12 slices @130mm crop (20 members); 224px x 9
+  slices @160mm (4 legacy members).
+- Outputs: `submission.csv` (24-member weighted rank mean),
+  `submission_public_0899.csv` ("exact no-jitter public-frontier rank mean of 20
+  members" -- the 0899 in the name implies a 0.899 public score for that
+  variant), plus e10/native/legacy-blend variants and a repro receipt.
+
+**Engineering worth stealing: they FINGERPRINT every member.** Each member's
+weights are checked against a stored fingerprint on a seeded input ("fingerprint
+matches within 2.8e-06") before it is allowed into the blend, so a member can
+never silently run under mismatched preprocessing. Our own PLAN.md called for
+exactly this ("each member should carry its own preprocessing fingerprint") and
+we never built it -- and the 0.5 submission is precisely the failure mode it
+prevents. **Build this before trusting any multi-member blend of ours.**
+
+**License trail partly closed**: the receipt's `encoder_sha256` is
+`08629f7e7bd3e29b8ee9522ca3f65ce4d010a7ddf74f0ea3c7e3f3d0bbab0734`, byte-identical
+to the SHA256 in `shigechan/radimagenet-resnet50-official`'s description. So the
+deployed RadImageNet encoder is the pinned `Lab-Rasool/RadImageNet` revision with
+real provenance, not an unidentified copy.
+
+**Why this matters**: their machinery now runs in our account with every member
+loaded and verified. Redirecting it at the 881-study clean holdout is now a small,
+contained change -- exactly the "surgical, not a rewrite" path, and the
+prerequisite for the honest validation that actually differentiates us.
+
 ## THEIR PREPROCESSING IS SIMPLER THAN OURS (2026-09-05) -- uncomfortable finding
 
 Read their `build_study` (notebook cell 22). Side by side:
