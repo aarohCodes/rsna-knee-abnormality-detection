@@ -29,6 +29,19 @@ regardless.
 title). Nothing above 0.937 is published. `rsna-knee-bee` is the strongest
 available base.
 
+**Deliberately NOT attempting**: a clean-holdout validation of `rsna-knee-bee`.
+Its path resolution is far more diffuse than the earlier notebook -- six cells
+independently reference test.csv/test_series, ROOT is assigned in two of them,
+COMP in another, plus exec'd runtime code -- so the redirect surface is large and
+the payoff is a nice-to-have number rather than score. Not a good trade.
+
+**We do not need it anyway.** The holdout was calibrated against reality: it
+predicted 0.9194 for the file that scored 0.922, an error of 0.003. That mapping
+runs both ways, so once all three candidates are submitted, **their public scores
+are themselves a reliable selection signal** for choosing the final two. This is
+the cheaper route to the same selection discipline, and it is a further reason to
+submit all three rather than guessing between them.
+
 **Budget**: 13.5h GPU remaining this week, refreshing Saturdays at 30h. About six
 weeks left.
 
