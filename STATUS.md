@@ -90,6 +90,47 @@ fork can therefore never be reproduced faithfully by us, which is very likely th
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
 
+### bee-v2 VALIDATED, AND A METADATA BUG I CAUSED (2026-09-06, ~22:40)
+
+**First bee-v2 run FAILED** -- `FileNotFoundError:
+/kaggle/input/models/metaresearch/dinov2/pytorch/small/1`. All 20 DINOv2 members
+were dropped one by one ("costs one vote, not the run") until none remained, and
+the kernel died on `WeightsError: no member produced predictions`.
+
+**Cause was mine**: I hand-wrote the kernel-metadata dict instead of deriving it
+from a known-good file, which silently dropped **`model_sources`**. Kaggle Models
+are a SEPARATE metadata key from `dataset_sources`, so attaching all seven
+datasets still left the DINOv2 backbone unattached. Fixed by rebuilding the
+metadata from our V8 fork's file, changing only the id and dataset list.
+
+**Permanent guard added**: a parity assertion that every load-bearing key the
+author declares (`model_sources`, `kernel_sources`, `competition_sources`, the
+enable flags, `machine_shape`) is present and complete in our fork. Ran it
+retroactively against `dinosaurs-v2`: **PASS** (that one was built by editing
+existing metadata rather than retyping, which is why it was unaffected).
+**Rule: never retype a fork's metadata; derive it and assert parity.**
+
+**Second run: COMPLETE and fully validated.**
+```
+weights package: 20 member(s)                 <- 0 dropped
+[arm 0..3] done + freed | 0/3 study fallback(s)
+[resgated] blended CoAtNet resgated e4/e6/e8 into the Raptor arm (alpha 0.40)
+infra0021 audit PASSED | public0033 overlay PASSED
+BEES_KNEES_V1_PASS / V3_QUALITY_PASS / V4_FRONTIER_AUDIT_PASS / V6_WEIGHT_OVERLAY_PASS
+integrity check PASSED: no NaNs, no constant columns
+BEE_RESGATED_APPLIED=True alpha=0.4 error=None
+```
+The checkpoint SHA pin again resolved to `e1443bb0...`, re-confirming the public
+copy is byte-identical to the private one we cannot access.
+
+**Runtime, correctly attributed**: the log shows 371s between the raptor stage and
+the resgated line, but the arm's own receipt says `elapsed_seconds = 34.5` --
+essentially identical to dinosaurs-v2's 35.0s. The difference is fixed overhead
+(isolated pip install of the pinned OpenCV, subprocess startup), NOT per-study
+cost. Extrapolated: ~51 min on 1,322 studies.
+**So V9 drops one raptor arm (widedense, ~1h) and adds the resgated arm (~1h) --
+roughly runtime-neutral versus the V8 bee already pending.**
+
 ### THE BEE AUTHOR SHIPPED V9, AND OUR PENDING RUN IS THE ABANDONED V8 (2026-09-06, ~22:15)
 
 Having found one missing-dataset defect, I checked the other candidates for the
