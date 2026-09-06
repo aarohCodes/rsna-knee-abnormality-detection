@@ -446,8 +446,67 @@ didn't. Not yet submitted to competition -- ready to.
    Worth raising with the user as a candidate next item once multi-slice
    resolves.
 
-Explicitly deferred / do not start without asking again: external MRI datasets
-(MRNet/OAI) and RadImageNet-style domain-specific pretrained backbones.
+**DEFERRAL LIFTED 2026-09-05 for RadImageNet** -- user explicitly approved
+pursuing it after seeing that it is central to the top ensemble (appears at
+multiple stages/slot layouts in the 0.95 cluster's pipeline; official
+ResNet-50 weights published by `marwanmath`). External MRI datasets
+(MRNet/OAI) remain deferred -- still ask before starting those.
+
+## WHAT THE 0.95 CLUSTER ACTUALLY IS (read 2026-09-05, notebooks pulled)
+
+Pulled and read both public notebooks (source in
+`data/interim/public_notebooks/`, outputs stripped into `*.src.py`).
+
+**It is not leakage and not a secret technique. It is ONE shared community
+ensemble that ~17 teams fork and re-tweak.** `mattiaangeli/bend-the-knee-to-
+dinov3-ensembled` is a rank-mean of **twenty DINOv2 models + one DINOv3
+ViT-S/16 + RadImageNet ResNet-50 heads** run at two different slot layouts,
+pooling publicly-shared trained weights from ~8 people, plus **three**
+report-label sources (pilkwang's, lixin73's, and stevenleehans' -- the one we
+already use) cross-checked against each other. Public fold weights live in a
+dataset called `knee-mri-fold-weights`.
+
+**The author explicitly warns it is public-LB overfit** (quoting cell 0):
+"This notebook is now likely overfit to the public leaderboard: after users
+repeatedly forked and republished it with one or two parameter tweaks, I also
+followed movements of only 0.001-0.003." He calls the fork-and-republish race
+"opportunistic reuse, not original work" and recommends using an earlier
+version, or the DINOv3 member, **validated locally on held-out labelled
+studies**. This is highly relevant to our PRIVATE-LB goal: much of the
+0.949-0.954 spread is public-30% noise-chasing and should shuffle on private.
+(This also refines the earlier leakage theory: leakage was the wrong
+explanation, but public-LB overfitting via a community fork race is real and
+documented by the author himself.)
+
+**Their architecture is genuinely more expressive than ours.** They add a
+learned type embedding (plane x fat-suppression) to every token, concatenate
+the tokens of EVERY series in a study into one key/value sequence, and have
+twelve learned queries (one per finding) cross-attend over all of it with
+multi-head attention; each query output is concatenated with the mean AND max
+of per-series CLS embeddings. Missing series are handled by key-padding mask,
+nothing imputed. Ours computes per-slot summaries FIRST and attends over those
+-- strictly less information reaches each finding. This is a concrete,
+copyable architectural upgrade.
+
+**Other calibration**: `prvsiyan/rsna-knee-read-the-report-then-the-knee`
+(251 votes) has a stated verified score of **0.906** -- even that elaborate
+single-author pipeline sits well below the cluster. The 0.95s come from
+POOLING, not from one better idea. That notebook also contains a nine-language
+report->twelve-graded-targets extractor (cell 4), an independent Synovitis
+specialist, PCA exact-label specialists, a "leakage-safe DICOM-header branch",
+and a `raidium/curia-2` DINOv2-base frozen *radiology* encoder (TPU stage).
+
+**DINO generations (checked Kaggle model catalog 2026-09-05)**: there is **no
+DINOv4** (search returns nothing; does not exist). DINOv3 IS available:
+`keras/dinov3` (ViT + ConvNeXt), `mdabrarhossainzahin/dinov3` (ViT-B/16),
+`unmol03/dinov3-vit-large`, `pr4deepr/dinov3-vith16plus`. We have been on
+DINOv2-base all along, so DINOv3 is a real upgrade path.
+
+**STRATEGY DECISION (user, 2026-09-05)**: **use public components AND add our
+own value** -- build on the public Apache-2.0 ensemble like the rest of the
+field, but differentiate by validating properly (5-fold CV on held-out labels)
+instead of noise-chasing the public LB, exactly as the notebook author himself
+recommends. RadImageNet deferral LIFTED (see below). MRNet/OAI still deferred.
 
 ## CRITICAL REALITY CHECK (2026-09-05) -- READ BEFORE PLANNING ANYTHING
 
