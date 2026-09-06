@@ -277,3 +277,72 @@ def test_discriminative_param_groups_excludes_frozen_params():
 
     head_group_params = set(id(p) for p in groups[1]["params"])
     assert head_group_params == set(id(p) for p in model.head.parameters())
+
+
+def _slice_cross_head(embed_dim=16, num_slots=6, num_labels=12):
+    from rsna_knee.models.vision import SliceCrossAttentionHead
+
+    torch.manual_seed(0)
+    h = SliceCrossAttentionHead(embed_dim=embed_dim, num_slots=num_slots, num_labels=num_labels, num_heads=2)
+    h.eval()
+    return h
+
+
+def test_slice_cross_head_output_shape_and_k1_equivalence():
+    head = _slice_cross_head()
+    emb4 = torch.randn(3, 6, 4, 16)
+    mask = torch.ones(3, 6)
+    assert head(emb4, mask).shape == (3, 12)
+
+    # a 3-dim (B, S, D) input is accepted as the K=1 case
+    emb3 = torch.randn(3, 6, 16)
+    assert head(emb3, mask).shape == (3, 12)
+    assert torch.allclose(head(emb3, mask), head(emb3.unsqueeze(2), mask), atol=1e-6)
+
+
+def test_slice_cross_head_ignores_absent_slots():
+    """Absent slots must not influence the output at all -- they are removed by
+    key_padding_mask, not imputed. Changing a masked-out slot's content must leave
+    logits bit-identical."""
+    head = _slice_cross_head()
+    emb = torch.randn(2, 6, 4, 16)
+    mask = torch.ones(2, 6)
+    mask[:, 3:] = 0.0  # slots 3,4,5 absent
+
+    before = head(emb, mask)
+    emb2 = emb.clone()
+    emb2[:, 3:] = torch.randn_like(emb2[:, 3:]) * 100  # garbage in the absent slots
+    after = head(emb2, mask)
+
+    assert torch.allclose(before, after, atol=1e-6)
+
+
+def test_slice_cross_head_is_sensitive_to_a_single_slice():
+    """The whole point of the corrected design: evidence on ONE slice out of many
+    must survive. Mean-pooling over K would dilute it by 1/K; cross-attention can
+    select it. This asserts the signal is not washed out."""
+    head = _slice_cross_head()
+    mask = torch.ones(1, 6)
+    torch.manual_seed(7)
+    base = torch.zeros(1, 6, 16, 16)  # 16 slices per slot, all uninformative
+
+    spiked = base.clone()
+    # A distinctive *direction*, not a uniform offset: kv_norm is a LayerNorm, which
+    # is invariant to adding the same constant to every dimension of a token, so a
+    # constant spike would be erased by construction and prove nothing.
+    spiked[0, 2, 7] = torch.randn(16) * 5.0
+
+    delta = (head(spiked, mask) - head(base, mask)).abs().max().item()
+    assert delta > 1e-3, f"single-slice evidence was washed out (max logit delta {delta:.2e})"
+
+
+def test_slice_cross_head_survives_all_slots_absent():
+    """Every key padded would make softmax produce NaN and silently poison a whole
+    submission. The head falls back rather than emitting NaNs."""
+    head = _slice_cross_head()
+    emb = torch.randn(2, 6, 3, 16)
+    mask = torch.zeros(2, 6)  # nothing present at all
+
+    out = head(emb, mask)
+    assert out.shape == (2, 12)
+    assert torch.isfinite(out).all(), "NaN/Inf produced when all slots absent"

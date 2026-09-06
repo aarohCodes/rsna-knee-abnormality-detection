@@ -22,6 +22,82 @@ IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 
 
+class SliceCrossAttentionHead(nn.Module):
+    """Per-diagnosis cross-attention over EVERY (slot, slice) token, without ever
+    averaging the slice dimension away.
+
+    Why this exists: our first multi-slice attempt (roadmap item 6) fed K crops per
+    slot but then **mean-pooled over K** before `SlotAttentionHead` ran, which
+    averages out exactly the evidence extra slices carry -- a tear visible on two of
+    sixteen slices is diluted by the fourteen that show nothing. That test scored
+    tier1 0.7866 vs 0.7931 and we wrongly concluded "multi-slice doesn't help".
+    Inspecting the public DINOv3 member's checkpoint showed it uses n_slice=16 with
+    genuine cross-attention (`nn.MultiheadAttention`, twelve learned per-finding
+    queries) over all tokens and never averages them. So the flaw was the
+    aggregation, not the premise. See STATUS.md.
+
+    Input:  slot_embeddings (B, S, K, D) -- K may be 1; presence_mask (B, S).
+    Output: logits (B, num_labels).
+
+    Each finding's query attends over all S*K tokens at once, so it can draw
+    evidence from any slice of any series. Absent slots are removed via
+    key_padding_mask rather than imputed. The query output is concatenated with a
+    mean over present tokens before the classifier, so a finding still has a global
+    summary available alongside whatever its query selected.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_slots: int,
+        num_labels: int,
+        num_heads: int = 4,
+        dropout: float = 0.2,
+    ):
+        super().__init__()
+        # One learned embedding per slot type, broadcast across that slot's K slices,
+        # so a token carries which sequence it came from (plane x weighting x fat-sat).
+        self.slot_type = nn.Parameter(torch.zeros(num_slots, embed_dim))
+        nn.init.normal_(self.slot_type, std=0.02)
+        self.queries = nn.Parameter(torch.zeros(num_labels, embed_dim))
+        nn.init.normal_(self.queries, std=0.02)
+        self.kv_norm = nn.LayerNorm(embed_dim)
+        self.attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, batch_first=True)
+        # dropout in the head: absent from SlotAttentionHead, and our documented
+        # failure mode across six experiments was overfitting the noisy silver labels.
+        self.drop = nn.Dropout(dropout)
+        self.classifier = nn.Linear(embed_dim * 2, num_labels)
+        self.num_labels = num_labels
+
+    def forward(self, slot_embeddings: torch.Tensor, presence_mask: torch.Tensor) -> torch.Tensor:
+        if slot_embeddings.dim() == 3:  # (B, S, D) -> treat as K=1
+            slot_embeddings = slot_embeddings.unsqueeze(2)
+        b, s, k, d = slot_embeddings.shape
+
+        tokens = slot_embeddings + self.slot_type.view(1, s, 1, d)
+        tokens = self.kv_norm(tokens.reshape(b, s * k, d))
+
+        # key_padding_mask: True = ignore. A slot's K tokens share its presence bit.
+        pad = (presence_mask < 0.5).unsqueeze(-1).expand(b, s, k).reshape(b, s * k)
+        # Guard: a study with zero present slots would make every key padded, which
+        # yields NaN from softmax. Callers are expected to guarantee >=1 present slot
+        # (StudyDataset does), but fall back to attending over everything rather than
+        # emitting NaNs that would silently poison a whole submission.
+        all_padded = pad.all(dim=1)
+        if all_padded.any():
+            pad = pad.clone()
+            pad[all_padded] = False
+
+        q = self.queries.unsqueeze(0).expand(b, self.num_labels, d)
+        ctx, _ = self.attn(q, tokens, tokens, key_padding_mask=pad, need_weights=False)
+
+        keep = (~pad).unsqueeze(-1).to(tokens.dtype)
+        pooled = (tokens * keep).sum(1) / keep.sum(1).clamp(min=1.0)  # (B, D)
+        joint = torch.cat([self.drop(ctx), pooled.unsqueeze(1).expand_as(ctx)], dim=-1)
+        # one classifier row per finding, applied to that finding's own context
+        return (joint * self.classifier.weight.unsqueeze(0)).sum(-1) + self.classifier.bias
+
+
 class SlotAttentionHead(nn.Module):
     """Per-diagnosis masked attention pooling over slot embeddings.
 
@@ -124,22 +200,40 @@ class KneeMultiLabelModel(nn.Module):
         pretrained: bool = True,
         attn_dim: int = 128,
         hf_pretrained_path: str | None = None,
+        head: str = "slot",
     ):
         """If `hf_pretrained_path` is set, uses HFSlotEncoder (a local HuggingFace
         `transformers` checkpoint, e.g. a mounted Kaggle DINOv2 Model source) and
         ignores `backbone_name`/`pretrained`; otherwise uses the timm-based SlotEncoder.
+
+        `head` selects the aggregation:
+        - "slot" (default): `SlotAttentionHead`, which requires one embedding per slot,
+          so multi-slice input must be mean-pooled over K first. Keeps every existing
+          checkpoint (base v1/v2/v3 etc.) loadable unchanged.
+        - "slice_cross": `SliceCrossAttentionHead`, which cross-attends over every
+          (slot, slice) token without averaging. This is the corrected multi-slice
+          design -- see that class's docstring for why the mean-pooling version
+          failed. NOT state-dict compatible with "slot" checkpoints.
         """
         super().__init__()
         if hf_pretrained_path is not None:
             self.encoder = HFSlotEncoder(hf_pretrained_path)
         else:
             self.encoder = SlotEncoder(backbone_name, pretrained=pretrained)
-        self.head = SlotAttentionHead(
-            embed_dim=self.encoder.embed_dim,
-            num_slots=num_slots,
-            num_labels=num_labels,
-            attn_dim=attn_dim,
-        )
+        self.head_kind = head
+        if head == "slice_cross":
+            self.head = SliceCrossAttentionHead(
+                embed_dim=self.encoder.embed_dim, num_slots=num_slots, num_labels=num_labels
+            )
+        elif head == "slot":
+            self.head = SlotAttentionHead(
+                embed_dim=self.encoder.embed_dim,
+                num_slots=num_slots,
+                num_labels=num_labels,
+                attn_dim=attn_dim,
+            )
+        else:
+            raise ValueError(f"unknown head {head!r}; expected 'slot' or 'slice_cross'")
 
     def forward(self, images: torch.Tensor, presence_mask: torch.Tensor) -> torch.Tensor:
         """images: (B, S, C, H, W) or (B, S, K, C, H, W), presence_mask: (B, S) ->
@@ -159,8 +253,14 @@ class KneeMultiLabelModel(nn.Module):
         else:
             b, s, k, c, h, w = images.shape
         flat = images.reshape(b * s * k, c, h, w)
-        embeddings = self.encoder(flat).view(b, s, k, -1).mean(dim=2)
-        return self.head(embeddings, presence_mask)
+        embeddings = self.encoder(flat).view(b, s, k, -1)
+        if self.head_kind == "slice_cross":
+            # keep every (slot, slice) token: the head cross-attends over all of them
+            return self.head(embeddings, presence_mask)
+        # "slot" head takes one embedding per slot, so K must collapse first. This
+        # mean is exactly what made our first multi-slice test fail -- see
+        # SliceCrossAttentionHead's docstring.
+        return self.head(embeddings.mean(dim=2), presence_mask)
 
     def discriminative_param_groups(self, encoder_lr: float, head_lr: float) -> list[dict]:
         """Two optimizer param groups: a low LR for the (partially unfrozen) encoder,
