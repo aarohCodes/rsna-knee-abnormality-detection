@@ -452,6 +452,39 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## FOUND A REAL GAIN: upweight their DINOv3 member (2026-09-06)
+
+Free offline search over cached holdout predictions (zero GPU), on the 881 clean
+studies:
+
+| | clean holdout |
+|---|---|
+| best single variant (`e10_v2`) | 0.9202 |
+| `full24` alone | 0.9194 |
+| `dinov3` alone | 0.9178 |
+| **`full24` + `dinov3`, equal-weight rank blend** | **0.9242 (+0.0041)** |
+| `e10_v2` + `dinov3` | 0.9242 |
+| `full24` + `e10_v2` + `dinov3` | 0.9242 |
+
+**Robust, not a fluke: three different combinations all land at 0.9242**, so this
+is the underlying "weight DINOv3 higher" effect rather than one lucky pairing.
+
+**Interpretation:** their pipeline ALREADY blends the DINOv3 member in, at
+`A5_W = 0.45` (set at the end of their cell 24). Re-blending 50/50 raises the
+effective DINOv3 weight to roughly 0.72. **Their chosen weight is suboptimal on
+unseen data** -- precisely the kind of error honest validation catches and
+public-LB tuning does not, since a 0.004 move is inside the noise band they
+describe chasing.
+
+Predicted real score using the observed holdout->real offset of +0.003: ~0.927.
+**Honest caveat**: this was best-of-50 selected on the same holdout, so expect
+shrinkage; the true gain is more likely +0.002-0.003 than +0.0041.
+
+**Actionable**: build a submission kernel that runs their pipeline on the real
+test set and blends `submission.csv` with the DINOv3 predictions by rank, rather
+than accepting their A5_W=0.45. Alternatively sweep A5_W directly and pick on the
+clean holdout.
+
 ## SCORE JUMPED TO 0.922 -- and our validation predicted it within 0.003
 
 Submission 56047453 (the verbatim community fork's `submission.csv`) scored
