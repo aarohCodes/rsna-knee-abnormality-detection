@@ -452,6 +452,41 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## PUBLIC DINOv3 MEMBER DISSECTED (2026-09-05) -- and it CORRECTS our item-6 verdict
+
+Downloaded `mattiaangeli/knee-mri-fold-weights` (CC0) and inspected the
+checkpoints directly. Each `m_f{k}.pt` = {state_dict, cfg, fold}, and **the fold
+index IS stored** (m_f0->0 ... m_f4->4), confirming the split mapping.
+
+**Their config (verbatim):** backbone `vit_small_patch16_dinov3.lvd1689m` (DINOv3
+ViT-S/16 via **timm**, not HuggingFace -- the dataset bundles a timm-1.0.22
+wheel), `img: 336` (same resolution as ours), **`n_slice: 16`**, `pool: xcodex`,
+`cond: token`, `stem: native`, `pe_init: tiled`, `n_sites: 109`, labels exactly
+our 12 in our order.
+
+**Their readout architecture** (from state_dict shapes):
+- `enc.tok.weight (7, 384)` -- 7 learned type tokens added at the encoder
+- `readout.pool.q (12, 384)` -- twelve learned queries, one per finding
+- `readout.pool.attn.in_proj_weight (1152, 384)` -- a real `nn.MultiheadAttention`
+  (1152 = 3x384 for q/k/v), i.e. genuine cross-attention over all tokens
+- `readout.pres_emb.weight (7, 64)` -- presence embedding
+- `readout.pool.base.0 (832,)` -> `base.2 (12, 832)`; 832 = 384 + 384 + 64
+  (query output + pooled CLS + presence embedding) -> classifier
+
+**THIS CORRECTS OUR ITEM-6 CONCLUSION.** We closed item 6 as "multi-slice does
+not help" based on a K=3 test -- but our implementation **mean-pools over the K
+dimension** before the slot attention runs (`KneeMultiLabelModel.forward`:
+`.view(b, s, k, -1).mean(dim=2)`). Averaging slices destroys exactly the
+information extra slices provide. They use SIXTEEN slices with **cross-attention
+over all tokens**, never averaging them away. So the honest verdict is narrower:
+**"multi-slice with mean-pooling aggregation does not help"** -- the aggregation
+was very likely the flaw, not the premise. Item 6 should be considered REOPENED
+under a proper attention-based aggregation, not closed.
+
+This is now the most promising model-side lever we have identified, and unlike
+the six failed attempts it is motivated by a working reference implementation
+rather than a guess.
+
 ## ITEM 6 (multi-slice) CLOSED -- no clear benefit (2026-09-05)
 
 `rsna-knee-base-multislice-fresh` finished: K=3, 6 epochs, FRESH from pretrained
