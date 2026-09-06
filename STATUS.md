@@ -90,6 +90,41 @@ fork can therefore never be reproduced faithfully by us, which is very likely th
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
 
+### v2 VALIDATED: the recovered arm runs, and it fits the 9h cap (2026-09-06, ~21:30)
+
+`rsna-knee-dinosaurs-v2` save-run **COMPLETE**, and the log says exactly what we
+needed:
+
+```
+[coat-arm] blended OUR resgated e4/e6/e8 into the public Raptor arm (alpha 0.400)
+integrity check PASSED: 3 rows, no NaNs, no constant columns
+COAT_ARM_STATUS=OK {'private_alpha': 0.4, 'public_raptor_alpha': 0.6, ...}
+```
+
+Both hash gates passed on the public copies, the pinned wheel installed, the
+subprocess ran, the blend applied, and `_coat_raptor_blend_receipt.json` was
+written. **The arm we were silently missing now runs end to end.**
+
+**Runtime budget (the one real risk with v2), from the receipt's own numbers:**
+
+| stage | measured | extrapolated to 1,322 studies |
+|---|---|---|
+| DINOv3 / 20-member package | ~2s/study | ~0.7h |
+| 4 raptor arms | ~10.5s/study total (each arm re-decodes DICOM) | ~3.9h |
+| coat arm | 4.7s/study/shard, **2 T4 shards in parallel** | ~0.9h |
+| fixed overhead (loads, pip) | ~80s | ~0.1h |
+| **total** | | **~5.6h vs the 9h cap** |
+
+The coat arm is cheaper than feared because its runtime contract is
+`..._t4x2_v2`: it shards across both T4s (shard 0 took 1 study, shard 1 took 2,
+17.6s and 17.9s wall including ~8s of model load each). So it costs under an
+hour, not the ~3h a naive single-GPU extrapolation suggested.
+
+**Caveat, stated plainly**: this extrapolates from the 3-study placeholder test
+set, so it is an estimate, not a measurement. The real gate is the pending
+`rsna-knee-dinosaurs` submission -- identical pipeline minus the coat arm. If it
+scores, v2 is the same run plus ~0.9h, and the margin holds.
+
 ### RESOLVED: RadImageNet licence -- it is MIT, no conflict (2026-09-06)
 
 Checked three independent sources; all agree the **pretrained weights** are MIT:
