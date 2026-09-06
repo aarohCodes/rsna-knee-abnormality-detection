@@ -452,6 +452,44 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## TWO SUBMISSION CANDIDATES READY (2026-09-06) -- both integrity-checked
+
+| kernel | basis | validation |
+|---|---|---|
+| `rsna-knee-final-v1` | our fork + corrected DINOv3 blend weight (50/50 rank) | **holdout-validated 0.9242** -> predicted real ~0.925-0.927 |
+| `rsna-knee-dinosaurs` | the author's NEWER notebook + 3 raptor model families | **UNVALIDATED** -- see below |
+
+Both passed the integrity guard (no NaNs, no constant columns), which exists
+because two earlier submissions scored exactly 0.500 from a silent fallback to the
+all-0.5 file.
+
+**Recommendation: submit BOTH.** They are independent shots, the daily cap allows
+it, and the banked 0.922 is unaffected by a bad result. Then select the final two
+by what actually scored.
+
+## IMPORTANT CORRECTION: the optimisation space was NOT exhausted
+
+Earlier in this file I recorded that the optimisation space was closed. **That was
+wrong in an important way.** It was closed for *the notebook we forked*, while the
+public ecosystem kept adding model families. The "24 members buy only +0.0016"
+finding was about more of the SAME lineage, and I over-generalised it into
+"ensembling is saturated".
+
+Searching recently-updated public kernels found the same author has since
+published `mattiaangeli/bend-the-knee-to-the-dinosaurs`, attaching three
+`dreaddevelopment/raptor-knee-*` families (maxspan, native384, native384dense)
+that did not exist in our version, and crediting a notebook titled 0.937. **Check
+what has been newly published BEFORE concluding a space is exhausted** -- in a
+live competition the ecosystem moves, and this should have been checked far
+earlier than hour twelve.
+
+**Why the newer notebook could not be holdout-validated**: one of its raptor
+stages executes embedded source via `exec(compile(_KE_SRC, ...))` which resolves
+its own data paths -- effectively a THIRD root beyond ROOT and COMP -- so our
+fake-root redirect could not reach it, and it failed asserting 'study identity
+drift'. Unpicking generated code inside a string literal was judged not worth it
+against simply running it on the real test set, where the downside is bounded.
+
 ## LABEL-CEILING HYPOTHESIS IS LIKELY WRONG (2026-09-06) -- models denoise
 
 Free test, no GPU. `tonylica/rsna-knee-bend-dinov3-0917-repro-assets` contains
