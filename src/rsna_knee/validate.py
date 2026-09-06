@@ -30,6 +30,49 @@ def report_hash(report: str) -> str:
     return hashlib.sha1(normalized.encode("utf-8")).hexdigest()
 
 
+def community_fold(report: str, n_splits: int = 5) -> int:
+    """Reproduce the fold assignment used by the public community ensemble
+    (`mattiaangeli/bend-the-knee-to-dinov3-ensembled` and the notebooks it forks
+    from), whose published fold weights we want to evaluate honestly.
+
+    Their split is `int(md5(report_text).hexdigest()[:8], 16) % 5`, holding out
+    group 0 -- fully deterministic, no random seed, so it reproduces exactly. Note
+    the raw report text is hashed with NO normalization, unlike `report_hash`
+    above; matching them exactly matters more here than matching our own
+    conventions, since the whole point is to know which studies their published
+    weights were trained on.
+
+    Why this exists at all: their fold weights ship no fold-assignment file, and
+    measuring the overlap showed **80% of our own holdout (696 of 871 studies) is
+    inside their training data**. Scoring a public member on our holdout would
+    therefore be badly inflated. Evaluating on *their* group 0 (881 studies) is
+    clean for their members; anything of ours meant to be compared against them
+    must likewise be trained on groups 1-4 only. See STATUS.md.
+    """
+    digest = hashlib.md5(str(report).encode()).hexdigest()[:8]
+    return int(digest, 16) % n_splits
+
+
+def community_holdout_ids(
+    df: pd.DataFrame,
+    id_col: str = "StudyInstanceUID",
+    report_col: str = "Report",
+    holdout_fold: int = 0,
+    n_splits: int = 5,
+) -> tuple[list[str], list[str]]:
+    """Split `df` into (train_ids, holdout_ids) using the community fold definition
+    (see `community_fold`). Returns the same shape as `select_holdout_ids` so the two
+    are drop-in interchangeable at call sites.
+    """
+    reports = df.set_index(id_col)[report_col].fillna("")
+    holdout, train = [], []
+    for study_id in df[id_col]:
+        # their code falls back to hashing the study id when a report is missing
+        text = reports.get(study_id, study_id) or study_id
+        (holdout if community_fold(text, n_splits) == holdout_fold else train).append(study_id)
+    return train, holdout
+
+
 def make_grouped_multilabel_folds(
     df: pd.DataFrame,
     group_col: str,

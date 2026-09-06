@@ -93,3 +93,48 @@ def test_select_holdout_ids_keeps_duplicate_report_groups_together():
         ids_in_group = set(group_df["StudyInstanceUID"])
         # a duplicate-report group must be entirely in or entirely out of the holdout
         assert ids_in_group.issubset(holdout_set) or ids_in_group.isdisjoint(holdout_set)
+
+
+def test_community_fold_matches_reference_implementation():
+    """Must reproduce the public ensemble's split EXACTLY -- it is the only way to
+    know which studies their published fold weights were trained on. Reference,
+    verbatim from their notebook:
+        int(hashlib.md5(rep.encode()).hexdigest()[:8], 16) % 5
+    """
+    import hashlib as _h
+
+    from rsna_knee.validate import community_fold
+
+    for text in ["normal knee mri", "", "Rodilla derecha: rotura de menisco", "x" * 500]:
+        expected = int(_h.md5(text.encode()).hexdigest()[:8], 16) % 5
+        assert community_fold(text) == expected
+
+
+def test_community_fold_is_deterministic_and_unnormalized():
+    """Deterministic across calls, and deliberately does NOT normalize whitespace/case
+    the way report_hash does -- matching their bytes exactly is the whole point."""
+    from rsna_knee.validate import community_fold
+
+    assert community_fold("Some Report") == community_fold("Some Report")
+    # differing only by case/whitespace should generally land differently; at minimum
+    # the function must not be silently normalizing them together by construction
+    assert community_fold("some report") == int(
+        __import__("hashlib").md5(b"some report").hexdigest()[:8], 16
+    ) % 5
+
+
+def test_community_holdout_ids_partitions_completely():
+    from rsna_knee.validate import community_holdout_ids
+
+    df = pd.DataFrame(
+        {
+            "StudyInstanceUID": [f"s{i}" for i in range(200)],
+            "Report": [f"report text number {i}" for i in range(200)],
+        }
+    )
+    train, holdout = community_holdout_ids(df)
+
+    assert set(train) | set(holdout) == set(df["StudyInstanceUID"])
+    assert not (set(train) & set(holdout))
+    # roughly a fifth should land in the holdout fold
+    assert 0.1 < len(holdout) / len(df) < 0.3
