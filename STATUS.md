@@ -452,6 +452,47 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## OPTIMISATION SPACE EXHAUSTED (2026-09-06). Submission kernel is at the optimum.
+
+Two further free offline searches, both on the 881 clean studies:
+
+**Blend weight sweep** -- `full24*(1-w) + dinov3*w`: 0.9194 at w=0, rising to
+**0.9242 across a broad plateau at w=0.4-0.6**, falling to 0.9178 at w=1.0. The
+plateau matters: our 50/50 choice is robust, not knife-edge. A three-way mix with
+`e10_v2` reaches 0.9245, only +0.0003, inside selection noise and not worth the
+complexity.
+
+**Per-label variant selection** -- our 50/50 blend WINS OUTRIGHT on 6 of 12
+labels (ACL, MCL, Medial Meniscus, Medial OA, Lateral OA, Fracture) and on macro.
+A per-label best-of-7 oracle reaches 0.9253, just +0.0010, and with 12 labels x 7
+candidates selected on the scoring data itself that will shrink to roughly zero
+out of sample. Not worth pursuing.
+
+**Every lever, measured honestly:**
+
+| lever | value |
+|---|---|
+| our own model (3 independent tests) | 0.000 |
+| ensemble breadth, 1 -> 24 members + RadImageNet | +0.0016 |
+| **blend weight correction** | **+0.0048 -- CAPTURED in submission_final_v1** |
+| per-label blending of our model | 0.000 |
+| per-label variant selection | +0.0010 oracle, ~0 real |
+| combining silver label sources (earlier) | negative |
+
+**Conclusion: `submission_final_v1` is at the practical optimum of this
+pipeline.** Clean holdout 0.9242, predicted real ~0.925-0.927 using the observed
++0.003 offset. Further gain requires something qualitatively different, not more
+search over this space -- do not spend GPU re-searching blends, weights, members
+or per-label schemes. They are all measured and closed.
+
+**Remaining honest gap**: rank 10 is 0.950, we project ~0.927 -- about 0.023.
+Best available reading is that a substantial part of that is accumulated
+public-set fitting by teams tweaking against the public 30% (author-documented
+behaviour; consistent with 24 members buying only +0.0016 and with our verbatim
+run of their code scoring 0.922). If so it should not transfer to the private
+70%. **This remains a hypothesis, not a measurement** -- we cannot see what the
+0.950 teams actually run.
+
 ## FOUND A REAL GAIN: upweight their DINOv3 member (2026-09-06)
 
 Free offline search over cached holdout predictions (zero GPU), on the 881 clean
