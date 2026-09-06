@@ -452,6 +452,45 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## ASSET LICENSE AUDIT (2026-09-05) -- resolve before shipping anything
+
+Same discipline that caught the two leaked label datasets. Checked via
+`kaggle datasets metadata <ref> -p <dir>` (note: fields are nested under an
+`info` key, not top level).
+
+| asset | Kaggle license | verdict |
+|---|---|---|
+| `mattiaangeli/knee-mri-fold-weights` | **CC0-1.0** | clean, public domain, no restrictions |
+| `tonylica/rsna-knee-bend-dinov3-0917-repro-assets` | **"other"**, NO description | **unverified -- do not ship without resolving** |
+| `marwanmath/resnet-50-radimagenet-marwan` | **CC-BY-NC-SA-4.0** | see conflict below |
+| `shigechan/radimagenet-resnet50-official` | "other", but documented | claims upstream **MIT** |
+
+**CONFLICT TO RESOLVE -- two copies of the same RadImageNet ResNet-50 carry
+contradictory license claims:**
+- `marwanmath/...` is tagged **CC-BY-NC-SA-4.0** with no description.
+- `shigechan/...` description states: "Original model is MIT licensed. Source:
+  Lab-Rasool/RadImageNet on Hugging Face, pinned revision
+  1c94f2700886f822c953989255e039352fba6c56. SHA256:
+  08629f7e7bd3e29b8ee9522ca3f65ce4d010a7ddf74f0ea3c7e3f3d0bbab0734."
+  (Far better provenance: pinned revision + checksum.)
+
+Why this matters beyond pedantry: **CC-BY-NC-SA's ShareAlike term requires
+derivatives to carry the SAME license, but the competition requires a winner to
+license their solution under CC-BY-NC 4.0 (no SA).** Those are not obviously
+compatible. If we win using a CC-BY-NC-SA component, we may be unable to grant
+what the competition requires. Also NC (NonCommercial) is at least arguable when
+competing for a $77,000 prize pool.
+
+**Action before any RadImageNet use ships**: verify the true upstream RadImageNet
+license (Mount Sinai's original release has historically been non-commercial
+research use, which would contradict the MIT claim). Prefer the copy with real
+provenance, and confirm upstream directly rather than trusting either uploader's
+tag. Do NOT assume MIT just because one description says so.
+
+**`tonylica/...0917-repro-assets`** (2.6GB, 3,778 downloads) is the largest
+shortcut available -- a verified 0.917 reproduction -- but has an unspecified
+license and no description. Treat as unverified until clarified.
+
 ## VALIDATION CONTAMINATION -- SOLVED (2026-09-05). READ BEFORE USING PUBLIC WEIGHTS.
 
 **The public fold weights (`mattiaangeli/knee-mri-fold-weights`: m_f0.pt..m_f4.pt)
