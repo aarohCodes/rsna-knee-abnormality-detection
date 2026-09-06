@@ -452,6 +452,42 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## VALIDATION CONTAMINATION -- SOLVED (2026-09-05). READ BEFORE USING PUBLIC WEIGHTS.
+
+**The public fold weights (`mattiaangeli/knee-mri-fold-weights`: m_f0.pt..m_f4.pt)
+ship NO fold-assignment file.** But their split is fully DETERMINISTIC and
+reproducible -- no random seed at all. From the public notebook's training code:
+
+    grp = md5(report_text).hexdigest()[:8] as int % 5     # group by report text
+    va  = [i for i in keep if grp[i] == 0]                # holdout = group 0
+    tr  = [i for i in keep if grp[i] != 0]                # train   = groups 1-4
+
+Reproduced locally against our train.csv (measured, not assumed):
+- THEIR holdout (md5(report)%5==0) = **881 studies**; their train = 3,526.
+- OUR holdout (seed=42, holdout_fold=0, iterative stratification) = 871 studies.
+- **696 of our 871 holdout studies (79.9%) are in THEIR TRAINING data.**
+- Only **175** studies are clean under BOTH definitions.
+- Gold studies: 11 in their holdout, 11 in ours, only **3 in both**.
+
+**CONSEQUENCE -- do not skip this.** Evaluating any public member on OUR holdout
+is ~80% contaminated and will produce a badly inflated number. Symmetrically,
+our own checkpoints (base v2 etc.) trained on 706 of the 881 studies in THEIR
+holdout, so they are contaminated on that set too. There is no free lunch:
+
+1. **For anything we TRAIN from here on in the ensemble line: adopt THEIR split**
+   (train on md5(report)%5 != 0, validate on == 0). That makes our members and
+   the public members directly comparable on one clean 881-study set.
+2. **For an immediate zero-retraining comparison**: the 175-study intersection is
+   clean for both sides. Small (n=175) but usable as a sanity check to compare
+   base v2 against public members before committing GPU to retraining.
+3. Historical tier1 numbers in this file are all on OUR fold 0 and are NOT
+   comparable to numbers computed on their group 0. Re-baseline before comparing.
+
+This is exactly the trap that pushes the whole cluster onto public-LB
+noise-chasing (they cannot validate honestly, so they chase 0.001-0.003 public
+movements). Being able to validate cleanly is our actual edge for the PRIVATE
+leaderboard -- it is the concrete substance behind the strategy the user chose.
+
 ## WHAT THE 0.95 CLUSTER ACTUALLY IS (read 2026-09-05, notebooks pulled)
 
 Pulled and read both public notebooks (source in
