@@ -452,6 +452,48 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## OUR MEMBER ADDS NOTHING -- DEFINITIVE (2026-09-06). Do not train another.
+
+Trained DINOv2-base on the community split (groups 1-4) so it never saw the 881
+fold-0 studies, then blended offline against their DINOv3 five-fold predictions.
+
+| | clean-holdout macro AUC |
+|---|---|
+| theirs alone (DINOv3 5-fold) | **0.9178** |
+| ours alone (clean) | 0.7735 |
+| blend ours@0.02 | 0.9175 |
+| blend ours@0.05 | 0.9168 |
+| blend ours@0.10 | 0.9151 |
+| blend ours@0.30 | 0.9010 |
+
+**Every blend weight is WORSE than theirs alone, monotonically decreasing.** The
+earlier +0.0063 "gain" at w=0.30 was entirely a memorisation artifact: base v2 had
+trained on 706 of those 881 studies, and removing that contamination dropped our
+solo score from 0.8854 to 0.7735 (a 0.111 inflation) and erased the blend benefit
+completely.
+
+**CONSEQUENCES:**
+1. **Do not train another member of ours.** The 12-15h plan is cancelled. This
+   3h run existed precisely to gate that decision and it returned a clear no.
+2. Our own modelling is not a path to 0.94. Six weeks of our experiments produced
+   0.7735 clean; their single member is 0.9178.
+3. I recommended that training run on the strength of the contaminated number.
+   That recommendation was wrong even though I had flagged the number as
+   unreliable -- flagging a caveat is not the same as acting on it.
+
+**WHERE 0.94 MIGHT ACTUALLY LIVE -- the key open question:**
+0.9178 is only their **DINOv3 component**. The deployed pipeline scoring ~0.95
+publicly blends **24 members plus two RadImageNet stages**, and that full ensemble
+has NEVER been measured on clean data. That is now the most important unanswered
+question in this project.
+
+Obstacle (known, already broke two attempts): their full pipeline's blending
+stages read from an earlier stage that still holds test-set study IDs, so
+redirecting only the DINOv3 stage is not enough. All stages must be redirected.
+Assets that make this cheaper: `their_holdout_predictions.csv` and
+`their_fold{0..4}_predictions.csv` are now saved locally, so any blending maths
+over the DINOv3 members is free and offline from here on.
+
 ## CONTAMINATION ALARM RESOLVED: 0.9178 IS HONEST (2026-09-06)
 
 Per-fold scores of the five public DINOv3 models, each scored alone on the 881
