@@ -452,6 +452,35 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## THEIR PREPROCESSING IS SIMPLER THAN OURS (2026-09-05) -- uncomfortable finding
+
+Read their `build_study` (notebook cell 22). Side by side:
+
+| | theirs | ours |
+|---|---|---|
+| slot definition | `Anatomical_Plane` x `Fat_Suppression` straight from train_series.csv | weighting DERIVED from DICOM headers (TR/TE -> T1/T2/PD), 6 canonical slots |
+| slice ordering | `InstanceNumber` | geometry: ImageOrientationPatient x ImagePositionPatient projected on the slice normal |
+| laterality | sign of `ImagePositionPatient[0]`, flip non-sagittal | full patient-coordinate image-centre computation |
+| intensity | percentile [1,99] on a 4x-subsampled crop | percentile over an n-slice sample |
+| crop | centre crop of CROP_MM at pixel spacing, cv2 resize | Nyquist-argued physical crop + resize |
+
+**We built the sophisticated version of nearly every step, and the pipeline that
+is actually in the top cluster does the simple thing.** Notably we adopted
+geometry-based ordering specifically because the original pilkwang baseline
+argued SOP-UID/filename order is unreliable -- and they just use InstanceNumber.
+
+Two readings, and we cannot yet tell which is right: either (a) our extra
+sophistication is not buying anything, and the engineering went somewhere that
+does not matter, or (b) they are leaving something on the table and our
+preprocessing is a genuine (if unproven) edge. Worth keeping in mind before
+attributing any future gap to preprocessing. It also means their pipeline is
+CHEAPER to run than ours per study, which partly explains how they afford
+n_slice=16.
+
+Their cell 22 already falls back to `train_series` when `test_series` is absent,
+which makes pointing their pipeline at holdout studies a small change rather
+than a rewrite -- relevant for evaluating their members honestly.
+
 ## PRACTICAL ASSESSMENT: run their notebook, don't reimplement it (2026-09-05)
 
 Their readout IS available: notebook cell 23 defines `TokenXAttnPool`, which
