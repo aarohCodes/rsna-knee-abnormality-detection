@@ -7,52 +7,84 @@ https://github.com/aarohCodes/rsna-knee-abnormality-detection (private -- kept
 private deliberately while the competition is active, per the rules requiring
 code disclosure only if we win).
 
-## >>> START HERE (2026-09-06 end of session) <<<
+## >>> START HERE (updated 2026-09-06, ~20:30) <<<
 
-**Banked public score: 0.922.** Rank 10 is 0.950. Deadline 2026-10-22.
+### Current state
+- **Banked public score: 0.922.** Rank 10 on the public LB is 0.950. Deadline 2026-10-22.
+- **THREE SUBMISSIONS ARE PENDING** (submitted by the user 20:14-20:15):
+  refs 56062615, 56062620, 56062626. They correspond to the three kernels below.
+  Scoring re-runs each pipeline against the real 1,322-study test set, so it takes
+  time. A background watcher is running; if this session is gone, just re-check
+  with `kaggle competitions submissions rsna-knee-abnormality-detection`.
 
-**THREE CANDIDATES ARE BUILT, VERIFIED AND WAITING FOR THE USER TO SUBMIT.**
-I cannot submit; only the user can click "Submit to Competition".
-
-| priority | kernel | expected |
+| kernel | basis | expectation |
 |---|---|---|
-| 1 | https://www.kaggle.com/code/aarohnanoti/rsna-knee-bee | **~0.937** (author documents 3 submissions at exactly 0.937; all his audits passed in our run) |
-| 2 | https://www.kaggle.com/code/aarohnanoti/rsna-knee-dinosaurs | unknown; newer notebook + 4 raptor families |
-| 3 | https://www.kaggle.com/code/aarohnanoti/rsna-knee-final-v1 | ~0.925-0.927 (holdout-validated 0.9242) |
+| `rsna-knee-bee` | prvsiyan "bee's knees" V8, a documented 0.937 | **~0.937** (strongest) |
+| `rsna-knee-dinosaurs` | author's newer notebook + 4 raptor families | unknown, unvalidated |
+| `rsna-knee-final-v1` | our fork + corrected DINOv3 blend weight | ~0.925-0.927 (holdout said 0.9242) |
 
-All three passed an integrity guard (no NaNs, no constant columns) added because
-two earlier submissions scored exactly 0.500 from a silent all-0.5 fallback.
-Submitting all three is safe: they are independent and the banked 0.922 stands
-regardless.
+### What to do when the scores land
+1. Compare the three. Our clean holdout has predicted real scores within 0.003
+   (0.9194 predicted -> 0.922 actual), so public scores are a trustworthy
+   selection signal here -- no separate holdout run needed per candidate.
+2. Keep the best two for final selection in October. Never select on a number we
+   have not seen; never select an unverified config.
+3. If bee lands ~0.937, the gap to rank 10 is ~0.013.
 
-**Searched thoroughly for better public bases** (by votes, by recency, by score in
-title). Nothing above 0.937 is published. `rsna-knee-bee` is the strongest
-available base.
+### ACTIVE TASK: resolve the RadImageNet licence question
+This is the open compliance item, requested by the user. Details in the ASSET
+LICENCE AUDIT section below. Summary of the problem:
+- The RadImageNet **repo** (github.com/BMEII-AI/RadImageNet) carries an MIT
+  licence, but that covers repo CODE. The **weights** ship separately via Google
+  Drive, and dataset access requires a request through radimagenet.com.
+- Two Kaggle copies of the same ResNet-50 carry **contradictory** tags:
+  `marwanmath/resnet-50-radimagenet-marwan` = **CC-BY-NC-SA-4.0** (no description);
+  `shigechan/radimagenet-resnet50-official` = "other", but its description claims
+  the upstream is **MIT**, citing HF repo `Lab-Rasool/RadImageNet`, pinned revision
+  `1c94f2700886f822c953989255e039352fba6c56`, SHA256
+  `08629f7e7bd3e29b8ee9522ca3f65ce4d010a7ddf74f0ea3c7e3f3d0bbab0734`.
+- **Confirmed same artefact**: the community pipeline's own repro receipt records
+  `encoder_sha256` identical to that SHA256, so the deployed encoder IS the pinned
+  Lab-Rasool revision.
+- **Why it matters**: CC-BY-NC-SA's ShareAlike term requires derivatives under the
+  same licence, while the competition requires a winner to license under
+  CC-BY-NC 4.0 (no SA). Those may be incompatible, so winning with a ShareAlike
+  component could leave us unable to grant what the rules require. NC
+  (NonCommercial) is also arguable against a $77,000 prize pool.
+- **Resolution paths, in order of value**: (a) check what licence the
+  `Lab-Rasool/RadImageNet` HF repo actually states for the weights at that pinned
+  revision; (b) check radimagenet.com's own terms of use / access agreement;
+  (c) check the RadImageNet paper (Radiology: AI, doi 10.1148/ryai.210315) for a
+  data/weights availability statement; (d) if still ambiguous, the clean move if
+  we place is to raise it openly with the competition hosts rather than hope it
+  goes unnoticed.
+- Current stance: PROCEED but documented, since the weights are freely
+  downloadable (meeting the rules' accessibility test) and every top team has the
+  same exposure. This is a judgment call, **not a clearance**.
 
-**Deliberately NOT attempting**: a clean-holdout validation of `rsna-knee-bee`.
-Its path resolution is far more diffuse than the earlier notebook -- six cells
-independently reference test.csv/test_series, ROOT is assigned in two of them,
-COMP in another, plus exec'd runtime code -- so the redirect surface is large and
-the payoff is a nice-to-have number rather than score. Not a good trade.
+### Compliance status overall (audited 2026-09-06)
+Clean: forking public Apache-2.0 notebooks; public datasets meeting "publicly
+available and equally accessible at no cost"; rejecting two leaked label datasets
+that bitwise-matched gold; declining the second-account workaround twice; repo
+kept private during the competition.
+Open: (1) RadImageNet licence, above. (2) The bee notebook depends on a PRIVATE
+dataset (`prvsiyan/bees-knees-rsna-public0033-weights-v1`, 403/unlisted) -- we did
+NOT access it, we used the byte-identical public copy in renta0426's bundle and
+left the author's SHA256 pin active to prove it. (3) If we place, attribution
+obligations are substantial since nearly all the work is other people's.
 
-**We do not need it anyway.** The holdout was calibrated against reality: it
-predicted 0.9194 for the file that scored 0.922, an error of 0.003. That mapping
-runs both ways, so once all three candidates are submitted, **their public scores
-are themselves a reliable selection signal** for choosing the final two. This is
-the cheaper route to the same selection discipline, and it is a further reason to
-submit all three rather than guessing between them.
+### Budget
+GPU ~13.5h remaining this week (30h/week, refreshes Saturdays). TPU 20h entirely
+unused. ~6 weeks to the deadline.
 
-**Budget**: 13.5h GPU remaining this week, refreshing Saturdays at 30h. About six
-weeks left.
-
-**The single most important process lesson from this session**: checking what the
-ecosystem has published beats optimising what you already hold. Most of the day
-went into careful optimisation of one forked snapshot, which yielded at most
-+0.005 and a declaration that the space was "exhausted". Two rounds of simply
-looking at recently-published kernels then found the raptor families and the
-0.937 notebook -- worth far more than every modelling experiment combined. Look
-outward first, and re-check periodically, because in a live competition the
-ecosystem moves under you.
+### The single most important process lesson from this session
+**Checking what the ecosystem has published beats optimising what you already
+hold.** Most of the day went into careful optimisation of one forked snapshot,
+worth at most +0.005, ending in a premature declaration that the space was
+"exhausted". Two rounds of simply looking at recently-published kernels then found
+the raptor families and the 0.937 notebook -- worth far more than every modelling
+experiment combined. Look outward first, and re-check periodically, because in a
+live competition the ecosystem moves under you.
 
 
 ## RESOLVED: GPU quota reset on schedule (2026-09-05T00:00:00)
