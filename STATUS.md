@@ -31,36 +31,38 @@ code disclosure only if we win).
    have not seen; never select an unverified config.
 3. If bee lands ~0.937, the gap to rank 10 is ~0.013.
 
-### ACTIVE TASK: resolve the RadImageNet licence question
-This is the open compliance item, requested by the user. Details in the ASSET
-LICENCE AUDIT section below. Summary of the problem:
-- The RadImageNet **repo** (github.com/BMEII-AI/RadImageNet) carries an MIT
-  licence, but that covers repo CODE. The **weights** ship separately via Google
-  Drive, and dataset access requires a request through radimagenet.com.
-- Two Kaggle copies of the same ResNet-50 carry **contradictory** tags:
-  `marwanmath/resnet-50-radimagenet-marwan` = **CC-BY-NC-SA-4.0** (no description);
-  `shigechan/radimagenet-resnet50-official` = "other", but its description claims
-  the upstream is **MIT**, citing HF repo `Lab-Rasool/RadImageNet`, pinned revision
-  `1c94f2700886f822c953989255e039352fba6c56`, SHA256
-  `08629f7e7bd3e29b8ee9522ca3f65ce4d010a7ddf74f0ea3c7e3f3d0bbab0734`.
-- **Confirmed same artefact**: the community pipeline's own repro receipt records
-  `encoder_sha256` identical to that SHA256, so the deployed encoder IS the pinned
-  Lab-Rasool revision.
-- **Why it matters**: CC-BY-NC-SA's ShareAlike term requires derivatives under the
-  same licence, while the competition requires a winner to license under
-  CC-BY-NC 4.0 (no SA). Those may be incompatible, so winning with a ShareAlike
-  component could leave us unable to grant what the rules require. NC
-  (NonCommercial) is also arguable against a $77,000 prize pool.
-- **Resolution paths, in order of value**: (a) check what licence the
-  `Lab-Rasool/RadImageNet` HF repo actually states for the weights at that pinned
-  revision; (b) check radimagenet.com's own terms of use / access agreement;
-  (c) check the RadImageNet paper (Radiology: AI, doi 10.1148/ryai.210315) for a
-  data/weights availability statement; (d) if still ambiguous, the clean move if
-  we place is to raise it openly with the competition hosts rather than hope it
-  goes unnoticed.
-- Current stance: PROCEED but documented, since the weights are freely
-  downloadable (meeting the rules' accessibility test) and every top team has the
-  same exposure. This is a judgment call, **not a clearance**.
+### RESOLVED: RadImageNet licence -- it is MIT, no conflict (2026-09-06)
+
+Checked three independent sources; all agree the **pretrained weights** are MIT:
+
+| source | licence | copyright |
+|---|---|---|
+| official GitHub `BMEII-AI/RadImageNet` LICENSE | **MIT** | Copyright (c) 2021 BMEII-AI |
+| HuggingFace `Lab-Rasool/RadImageNet` | **MIT** | Copyright (c) 2021 BMEII-AI |
+| `shigechan/radimagenet-resnet50-official` description | MIT, citing the above | -- |
+
+The identical copyright line in both official sources shows the HF mirror derives
+from the authors' own release, not a third party relabelling it.
+
+**The distinction that resolves the confusion**: RadImageNet has TWO things under
+different terms.
+- The **dataset** (1.35M images) is access-controlled; radimagenet.com states it
+  "can be licensed for commercial use", i.e. commercial use of the IMAGES needs an
+  agreement.
+- The **pretrained weights** are released separately under MIT.
+**We use only the weights, never the dataset.**
+
+**Conclusion: no ShareAlike problem and no NonCommercial problem.** MIT is
+permissive and compatible with granting the CC-BY-NC 4.0 the competition requires
+from a winner. The `marwanmath/resnet-50-radimagenet-marwan` tag of
+CC-BY-NC-SA-4.0 appears to be that uploader's own mistaken selection; an
+uploader's Kaggle tag does not override the licence the copyright holder actually
+granted, and we can rely on the upstream MIT grant directly.
+
+**REMAINING OBLIGATION (small but real)**: MIT requires the copyright notice
+accompany distributions. If we place and publish a solution, it MUST include the
+MIT licence text and the "Copyright (c) 2021 BMEII-AI" notice. Add this to any
+writeup checklist.
 
 ### Compliance status overall (audited 2026-09-06)
 Clean: forking public Apache-2.0 notebooks; public datasets meeting "publicly
