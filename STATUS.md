@@ -449,15 +449,57 @@ didn't. Not yet submitted to competition -- ready to.
 Explicitly deferred / do not start without asking again: external MRI datasets
 (MRNet/OAI) and RadImageNet-style domain-specific pretrained backbones.
 
-## Next action (pending user)
-`rsna-knee-base-continue` (base v2, tier1=0.7931, our best checkpoint) is
-COMPLETE and ready to submit -- waiting on the user to open
-https://www.kaggle.com/code/aarohnanoti/rsna-knee-base-continue and click
-"Submit to Competition" (I have no API access to do this). Do NOT submit
-`rsna-knee-base-continue-2` (base v3) -- confirmed regression, see above.
-5/5 daily submissions available (cap reset at 2026-08-31 00:00 UTC, all
-prior 5 used on 2026-08-30 UTC). Once base v2 is submitted and a real score
-comes back, move on to roadmap item 4 (multi-source silver labels).
+## ENDGAME PLAN (written 2026-09-05, ~6.7 weeks to the 2026-10-22 deadline)
+
+**Budget framing**: ~6.7 weeks x 30 GPU-h/week = **~200 GPU-hours total left**.
+That, not ideas, is the binding constraint -- plan against it.
+
+**The biggest untried lever, and it's specifically a PRIVATE-LB one:
+proper 5-fold CV ensembling.** Everything so far optimizes ONE model on ONE
+train/holdout split (seed=42, holdout_fold=0, unchanged all session). This is
+NOT the same as the ensemble that failed in roadmap item 2: that averaged
+three checkpoints from a SINGLE trajectory on a SINGLE split (highly
+correlated -- added nothing, regressed 0.782->0.775 on real LB). A 5-fold
+ensemble trains 5 models on 5 DIFFERENT 80% splits, which are genuinely
+decorrelated. It is the most reliable variance-reduction technique available
+and directly targets the private-LB risk: that our single-split result is a
+lucky artifact. It also fixes our least-trustworthy instrument -- tier1 has
+misled us before (the item-2 ensemble case); a 5-fold mean is far
+better-calibrated than one n=871 split. `make_grouped_multilabel_folds()` in
+validate.py already builds all 5 folds; we have only ever used fold 0.
+
+**Second, near-free win: we train on only 80% of the data** (3,536 of 4,407
+studies; 871 permanently held out). Correct during development, wasteful for
+the FINAL model. Once the recipe is frozen, retrain on 100%.
+
+| Phase | Weeks | GPU | What |
+|---|---|---|---|
+| Finish current tests | now | ~10h | multislice (in flight), then COR_FLUID_NOFS slot test (item 7) -- cheap single-variable checks |
+| **5-fold CV ensemble** | 2-3 | ~40h | 5 folds x ~4h on whichever recipe wins. Main structural investment. |
+| Validate + freeze | 4 | ~15h | Real submission confirming the ensemble beats 0.812. Freeze recipe. |
+| Final model | 5 | ~20h | Retrain on 100% of data; multi-seed if budget allows |
+| **Buffer** | 6 | reserve | Dry-run the exact final kernel, submit EARLY |
+
+**Three risks to keep front of mind:**
+1. **The submission path can silently fail** -- proven by the 0.5 multislice
+   bug (a config change produced a garbage submission that looked perfectly
+   healthy locally, tier1=0.7793). EVERY new configuration needs a real
+   confirmed submission before being trusted. We got lucky that v2 works.
+2. **Submission selection**: Kaggle usually lets you choose which submissions
+   count for private LB (typically 2). Make sure the selected ones are
+   genuinely our best -- never let a 0.5 or an unverified config be selected.
+3. **Do not burn the final week's quota.** If a fix is needed in week 6 with
+   no GPU-hours left, we ship whatever is already submitted.
+
+**Honest calibration**: the visible ~0.952 leader may be leakage-inflated and
+could collapse on private. First place is not promisable. But the moves above
+(variance reduction, using all the data, not shipping a broken submission) are
+what actually move PRIVATE rank, versus chasing public-LB points -- which is
+the stated goal.
+
+**Current best (already submitted, confirmed real): base v2 = 0.812 public.**
+Nothing has beaten it. Do NOT submit `rsna-knee-base-continue-2` (base v3,
+regression) or the ensemble kernel (0.775 regression).
 
 ## Submission mechanics reminder
 I can push/run kernels via the Kaggle API, but **clicking "Submit to Competition"
