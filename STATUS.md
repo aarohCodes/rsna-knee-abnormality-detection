@@ -452,6 +452,51 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## FULL ENSEMBLE MEASURED ON CLEAN DATA (2026-09-06) -- +0.0016 over one component
+
+`rsna-knee-full-eval` v2. Redirected BOTH of their pipeline roots (ROOT for the
+24-member stage, COMP for the DINOv3 stage) at a fake competition directory
+holding only the 881 fold-0 studies as symlinks, so every stage scored the same
+unseen studies with no code patching.
+
+| on the clean 881-study holdout, vs silver | macro AUC |
+|---|---|
+| our best clean member | 0.7735 |
+| their DINOv3 component alone | 0.9178 |
+| **full 24-member ensemble + RadImageNet** | **0.9194** |
+| best variant (`submission_e10_v2.csv`) | **0.9202** |
+| legacy fold blend | 0.8971 |
+| native v38 | 0.8913 |
+| public_0899 variant | 0.8967 |
+
+**FINDING: the full ensemble buys +0.0016 over its DINOv3 component alone.**
+Twenty additional members plus two pinned RadImageNet stages are worth about
+0.002 on unseen data. The entire fork-race is optimising a layer that contributes
+almost nothing measurable off the public set.
+
+**CAVEAT -- DO NOT SKIP THIS.** These numbers are NOT comparable to the public
+leaderboard's 0.949, and it is wrong to conclude "the public LB is inflated by
+0.03" from them. The leaderboard scores against the competition's REAL labels on
+TEST studies; this scores against steven's SILVER labels on TRAINING studies.
+Silver agrees with gold only at ~0.8932, so "agreement with silver" is a
+different quantity from "agreement with truth", and models trained on silver may
+share its biases. Whether anyone reaches 0.94 against the true test labels is
+still unmeasured and cannot be settled from this holdout.
+
+(Recording this restraint deliberately: three times today I treated a single
+measurement as settling a broader question and had to retract -- the leakage
+theory, the multi-slice verdict, and the overfitting thesis. This measurement is
+real and useful; its scope is narrow.)
+
+**What it does establish, and what follows:**
+1. Ensemble breadth is not the lever. Going from 1 component to 24 members gains
+   ~0.002. Do not spend GPU chasing more members or blend-weight tweaks.
+2. `submission_e10_v2.csv` (0.9202) is the strongest variant on unseen data and a
+   better candidate than the default `submission.csv` (0.9194).
+3. The remaining honest gap to any higher target is not closable by the levers
+   tried so far: our member (worse, and harmful in blend), more members (+0.002),
+   or blend weights.
+
 ## OUR MEMBER ADDS NOTHING -- DEFINITIVE (2026-09-06). Do not train another.
 
 Trained DINOv2-base on the community split (groups 1-4) so it never saw the 881
