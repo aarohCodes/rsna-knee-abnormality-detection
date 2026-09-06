@@ -90,6 +90,28 @@ fork can therefore never be reproduced faithfully by us, which is very likely th
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
 
+### FIRST SCORE LANDED: 0.909 (2026-09-06, ~23:20)
+
+`56062626` (submitted 20:15:33, the last of the three) scored **0.909** --
+**below the banked 0.922**, so it is a regression and must not be among the two
+selected for the private LB.
+
+**ATTRIBUTION IS NOT ESTABLISHED.** The submissions API exposes only
+ref/date/status/score with no notebook reference, and `kernels list` tracks only
+save-runs, not submission runs. Note also that the ref->kernel mapping recorded
+earlier in this file was an ASSUMPTION from submission ordering, never verified.
+The Kaggle Submissions page shows the source notebook per row; check there.
+
+What each reading would mean:
+| if 0.909 is | interpretation |
+|---|---|
+| `rsna-knee-dinosaurs` (most likely) | confirms the missing-CoAtNet-arm diagnosis; a blend missing 24% of its weight landing 0.013 under baseline fits. Makes **dinosaurs-v2 more valuable**. |
+| `rsna-knee-bee` (V8) | supports the author reverting the five-view config; V9/bee-v2 is then clearly the right line |
+| `rsna-knee-final-v1` | the surprise: holdout predicted 0.9242 and has tracked within 0.003 all project. A 0.016 miss would be its first real failure and would undermine our main selection instrument. |
+
+Three submissions still pending (`56062615`, `56062620`, `56063873`=bee-v2,
+submitted 22:30). Their magnitudes should disambiguate without needing the UI.
+
 ### bee-v2 VALIDATED, AND A METADATA BUG I CAUSED (2026-09-06, ~22:40)
 
 **First bee-v2 run FAILED** -- `FileNotFoundError:
