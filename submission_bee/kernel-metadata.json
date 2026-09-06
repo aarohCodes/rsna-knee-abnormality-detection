@@ -14,7 +14,8 @@
     "dreaddevelopment/raptor-knee-native384",
     "dreaddevelopment/raptor-knee-native384dense",
     "dreaddevelopment/raptor-knee-widedense",
-    "tonylica/rsna-knee-bend-dinov3-0917-repro-assets"
+    "tonylica/rsna-knee-bend-dinov3-0917-repro-assets",
+    "renta0426/rsna-knee-public0033-meniscus-bag-v1"
   ],
   "model_sources": [
     "metaresearch/dinov2/PyTorch/small/1"
