@@ -90,6 +90,59 @@ fork can therefore never be reproduced faithfully by us, which is very likely th
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
 
+### THE BEE AUTHOR SHIPPED V9, AND OUR PENDING RUN IS THE ABANDONED V8 (2026-09-06, ~22:15)
+
+Having found one missing-dataset defect, I checked the other candidates for the
+same bug class. Our bee fork is **not** degraded -- its `coat` hits are only the
+CoAtNet *backbone* used by the raptor arms, and V8 genuinely does not need the
+coat dataset. But the diff turned up something more valuable.
+
+**The author published a new bee version (13:27 UTC) after we forked at ~10:12.**
+Cell-level diff of our fork against their current source:
+
+| cells | verdict |
+|---|---|
+| 0-5 | byte-identical |
+| **6** | **REPLACED**: ours `RAPTOR_FIVE_VIEW_..._V8`, theirs `RAPTOR_FOUR_VIEW_..._V9` |
+| 7 | differs: the arm weight table (V8 five-view vs V9 four-view) |
+| 8-9, 11-12 | byte-identical |
+| 10 | differs by exactly our private->public checkpoint glob patch |
+| 13 | our integrity guard (extra) |
+
+**What V9 changes, in the author's own words**: *"V9 restores the exact scored
+0.937 four-view contract; the new diversity is the resgated head blended into
+the Raptor output, not another entry here."* And at the top of cell 6:
+*"Exactly the scored 0.937 blend. V8's fifth view (widedense-v4) is reverted."*
+
+So V8 -- **the version we currently have pending** -- is an experiment that added
+a fifth view (`widedense-v4` at weight 0.25) which **the author has since backed
+out**. Its weights were a "stated prior rather than a fitted" value, by their own
+comment. V9 returns to the documented 0.937 four-view blend and adds the same
+CoAtNet resgated arm we just recovered for dinosaurs, at the same alpha 0.40.
+
+**Consequence: our pending bee run is the author's abandoned branch.** It may
+still score well, but the configuration with actual evidence behind it is V9.
+
+**Built and pushed `aarohnanoti/rsna-knee-bee-v2`** = author's V9 + our checkpoint
+glob patch re-applied + integrity guard + a `BEE_RESGATED_APPLIED=` report.
+Verifications done BEFORE dispatch, per the pinned lesson:
+- The patch was located **by content** (unique anchor assertion), not by cell
+  index -- the index moved from 10 to 12 between versions, so an index-based
+  insert would have silently corrupted the wrong cell.
+- Every code cell `ast.parse`d after assembly.
+- V9's `MAN_SHA`/`WHL_SHA` are the **same two hashes we already verified** against
+  the public copies, so both gates will pass.
+- Checked V9's "expected exactly one public0033 bundle manifest" assertion cannot
+  trip: the coat dataset contains no `bundle_manifest.json` (its file listing
+  begins at `cnx_...`, and any `b...` name would sort first).
+- Confirmed `raptor-knee-widedense` is correctly dropped: all four widedense
+  mentions in V9 are comments/URLs, and only four `raptor_ft_*.pt` files are
+  referenced.
+
+Its graft is **fail-open**: on error it restores the four-view bytes and records
+`applied=false`. Same silent-degradation shape as the dinosaurs arm, hence the
+explicit receipt check in our guard.
+
 ### v2 VALIDATED: the recovered arm runs, and it fits the 9h cap (2026-09-06, ~21:30)
 
 `rsna-knee-dinosaurs-v2` save-run **COMPLETE**, and the log says exactly what we

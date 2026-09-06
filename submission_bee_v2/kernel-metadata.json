@@ -1,0 +1,24 @@
+{
+  "id": "aarohnanoti/rsna-knee-bee-v2",
+  "title": "rsna-knee-bee-v2",
+  "code_file": "submission_kernel.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [
+    "dreaddevelopment/raptor-knee-maxspan",
+    "dreaddevelopment/raptor-knee-native384",
+    "dreaddevelopment/raptor-knee-native384dense",
+    "mattiaangeli/opencv-python-headless-4120088-x86",
+    "tonylica/rsna-knee-bend-dinov3-0917-repro-assets",
+    "mattiaangeli/rsna-knee-coat-resgated-ep10-top3",
+    "renta0426/rsna-knee-public0033-meniscus-bag-v1"
+  ],
+  "competition_sources": [
+    "rsna-knee-abnormality-detection"
+  ]
+}
