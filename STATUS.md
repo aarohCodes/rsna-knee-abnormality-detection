@@ -452,6 +452,48 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## DECISIVE MEASUREMENT (2026-09-06): the cluster's strength is REAL, not overfitting
+
+Scored the public DINOv3 5-fold member on **881 studies in their own fold-0
+holdout that those weights never trained on** (`rsna-knee-community-eval` v4).
+
+| | our base v2 | public DINOv3 member |
+|---|---|---|
+| tier1 (vs silver, held out) | 0.7931 | **0.9178** |
+| tier2 (vs gold) | 0.7774 | 0.8931 |
+
+**A SINGLE public member beats our entire pipeline by 0.125 on honest,
+uncontaminated validation.**
+
+**This OVERTURNS the hypothesis repeated throughout this session** -- that much of
+the 0.949 cluster was public-LB overfitting that would shuffle on the private
+70%. It is not. No leaderboard feedback could tune performance on studies that
+were never in training. Their members generalise genuinely. The author's
+overfitting warning applies to blend-weight tweaking BETWEEN forks (movements of
+0.001-0.003), not to underlying member quality. **Stop repeating the
+"cluster will collapse on private" theory -- it has now been measured and is
+false.**
+
+Caveat on tier2: n=881 is the study count, but gold labels exist for only ~11 of
+them, so each label's gold AUC rests on ~11 samples (hence several 1.000s).
+Do not draw conclusions from that row. tier1 on 881 studies is the solid number.
+
+**Strategic consequences -- these matter more than the number itself:**
+1. The gap is a CAPABILITY gap, not a tuning gap. Six weeks of our own
+   experiments produced 0.7931; one public member is at 0.9178. We will not
+   out-engineer that from scratch before 2026-10-22.
+2. The realistic path to top 10 runs through USING these members -- which the
+   notebook's own author explicitly endorses ("use the public DINOv3 member from
+   knee-mri-fold-weights and validate it locally; it was selected on held-out
+   labelled studies"). That is exactly what this run did.
+3. **Downgrade the "honest validation is our edge" thesis.** It was premised on
+   the field flying blind on inflated numbers. The members are genuinely strong,
+   so clean validation is useful for CHOOSING between candidates, not a
+   substitute for capability. Do not oversell it again.
+4. Our own contribution should now aim at DIVERSITY (a member decorrelated from
+   theirs) rather than at beating them outright, plus disciplined final
+   selection.
+
 ## COMMUNITY BASELINE FORK RUNS CLEANLY IN OUR ACCOUNT (2026-09-05)
 
 `aarohnanoti/rsna-knee-community-baseline` (verbatim fork, all 12 public dataset
