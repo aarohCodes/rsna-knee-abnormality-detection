@@ -452,6 +452,37 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## GOVERNING TARGET (user directive, 2026-09-06): >=0.94 on the CLEAN holdout
+
+User correction, verbatim in intent: **"Dont optimise for ranking, optimise to be
+able to get a 0.94+ score on the remaining 70% of the test data."**
+
+Adopt this as the success criterion for everything downstream. The distinction is
+substantive, not semantic:
+- Optimising RANK means partly benefiting from other teams overfitting the public
+  30%. That is outside our control and is not a plan.
+- Optimising SCORE ON UNSEEN DATA is an engineering target we can measure directly
+  and drive.
+
+**Operational form: >=0.94 macro AUC on the 881-study clean holdout** (their fold
+0, md5(report)%5==0), honestly measured -- i.e. scored with models that never
+trained on those studies. That number is a direct prediction of private-set
+performance rather than a leaderboard artifact.
+
+Consequences to hold to:
+1. Every candidate is measured on the clean holdout BEFORE it is submitted.
+2. The public LB is a sanity check that clean-holdout numbers track reality --
+   never a target. Do not chase 0.001-0.003 public movements; that is exactly the
+   documented trap the rest of the cluster is in.
+3. **This makes the per-fold contamination test the most important measurement in
+   flight.** If the public five-model mean (0.9178) is inflated because four of
+   five members trained on these studies, then their GENUINE unseen performance
+   may be well below 0.94 -- meaning possibly nobody in the visible cluster is
+   truly at 0.94 on unseen data, and the target is more reachable than the public
+   leaderboard suggests.
+4. Do not report a number as evidence of progress unless it was measured on data
+   the scored model never trained on.
+
 ## DECISIVE MEASUREMENT (2026-09-06): the cluster's strength is REAL, not overfitting
 
 Scored the public DINOv3 5-fold member on **881 studies in their own fold-0
