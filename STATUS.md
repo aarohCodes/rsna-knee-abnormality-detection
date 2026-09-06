@@ -452,6 +452,42 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## THREE CANDIDATES READY -- best reproduces a documented 0.937 (2026-09-06)
+
+| kernel | basis | status |
+|---|---|---|
+| `rsna-knee-final-v1` | our fork + corrected DINOv3 blend weight | holdout-validated **0.9242** -> predicted ~0.925-0.927 |
+| `rsna-knee-dinosaurs` | author's newer notebook + 3 raptor families | complete, unvalidated |
+| **`rsna-knee-bee`** | **prvsiyan "bee's knees" V8, a documented 0.937** | **complete, all author audits PASSED** |
+
+**`rsna-knee-bee` is the strongest candidate.** The author documents three
+consecutive submissions (V2, V6, V7) all scoring exactly 0.937.
+
+**It required real recovery work**: the notebook depends on
+`prvsiyan/bees-knees-rsna-public0033-weights-v1`, which is **PRIVATE** (403,
+unlisted), so it cannot run as published. Two fixes:
+1. Its metadata omits `renta0426/rsna-knee-public0033-meniscus-bag-v1`, needed for
+   the `public0033_meniscus10_bundle_v1` manifest. Attached the ORIGINAL only --
+   the loader asserts exactly one matching manifest, so also attaching the
+   `mattiaangeli` mirror would fail with "got 2" instead of "got 0".
+2. The pinned `checkpoint_epoch30.safetensors` lives in that private dataset, but
+   the identical file ships in the public renta0426 bundle. Patched the candidate
+   list to glob `/kaggle/input/**` for it rather than hardcoding a mount layout,
+   and **left their SHA256 pin intact**.
+
+**The pin then CONFIRMED the public copy is byte-identical**:
+`checkpoint_sha256 = e1443bb0f518418a31428cd7eb153f15af4c48c7175baf1f9d21c84f1c2a93e7`,
+matching `_B3_CKPT_SHA` exactly. All their audits passed (infra0021, public0033
+overlay, BEES_KNEES V1/V3/V4/V6), plus our own guard.
+
+**Generalisable lesson**: some published "reproducible" results depend on private
+assets and cannot actually be reproduced by anyone else. When a public mirror of
+the same artefact exists, redirect to it but keep the author's integrity checks
+running -- they then prove the substitution was sound rather than papering over it.
+
+**Recommendation: submit all three.** Independent shots, daily cap allows it, and
+the banked 0.922 is unaffected by any of them.
+
 ## TWO SUBMISSION CANDIDATES READY (2026-09-06) -- both integrity-checked
 
 | kernel | basis | validation |
