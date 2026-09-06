@@ -449,6 +449,62 @@ didn't. Not yet submitted to competition -- ready to.
 Explicitly deferred / do not start without asking again: external MRI datasets
 (MRNet/OAI) and RadImageNet-style domain-specific pretrained backbones.
 
+## CRITICAL REALITY CHECK (2026-09-05) -- READ BEFORE PLANNING ANYTHING
+
+**Checked the actual public leaderboard for the first time this session.
+Rank 10 = 0.949. We are at 0.812. Gap = 0.137 AUC.**
+
+The top is DENSELY PACKED: 0.954, 0.953, 0.953, 0.952, 0.951, 0.950, 0.950,
+0.950, 0.949 x6, 0.948... ~17 teams within 0.006 of each other.
+
+**This CORRECTS a hypothesis repeated many times earlier in this session**:
+that the ~0.952 leader might be leakage-inflated and could collapse on
+private. One team at 0.95 while the field sits at 0.80 would look like
+leakage. SEVENTEEN teams clustered at 0.95 looks like a known, shared,
+effective approach we have not found. Do not keep repeating the
+leakage-collapse theory -- the distribution does not support it.
+
+**THE CEILING PROBLEM (most important strategic fact in this file):**
+Our silver labels (steven's) score **0.8932 vs the 58 gold studies**. That is
+what our model trains to reproduce. A model that learns those targets
+PERFECTLY lands around ~0.89, not 0.95. Every queued roadmap item
+(multi-slice, slot gaps, 5-fold CV, 100%-data) is a MODEL-side improvement
+fighting a LABEL-side ceiling, worth maybe +0.01-0.02 combined. **None of
+them can reach top 10.** Teams at 0.95 must have something structurally
+different -- better label extraction, different use of gold, or a shared
+public approach.
+(Caveat, stated honestly: n=58 gold is small so 0.8932 has real uncertainty,
+and models can somewhat exceed noisy teachers since label noise partly
+averages out. But 0.89-ceiling labels -> 0.95 is not a plausible jump.)
+
+**PUBLIC NOTEBOOKS THAT LIKELY EXPLAIN THE CLUSTER (found 2026-09-05, not
+yet read -- highest-value next action, zero GPU cost):**
+- `mattiaangeli/bend-the-knee-to-dinov3-ensembled` (207 votes) -- **DINOv3**,
+  ensembled. We have been on DINOv2-base this whole time. Newer backbone
+  generation; the DINOv2 small->base swap already gave us a real gain, so a
+  DINOv3 swap is mechanically familiar and plausibly significant.
+- `prvsiyan/rsna-knee-read-the-report-then-the-knee` (251 votes) -- title
+  implies extracting signal from Report text = directly aimed at our label
+  ceiling.
+- `prvsiyan/head-and-shoulders-knees-and-toes` (176 votes)
+Reading public notebooks is explicitly allowed (same category as
+pilkwang/rsna-knee-baseline-v1, the source of our slot/geometry/laterality
+techniques) and the user confirmed "use anything you want, but make sure
+it's allowed in the rules."
+
+**REVISED PRIORITY ORDER (supersedes the phase table below until resolved):**
+1. Read both notebooks; determine what the 0.95 cluster actually does.
+2. Fix the LABEL ceiling first -- nothing else matters until it moves.
+3. Test DINOv3 as a backbone swap.
+4. Only then return to the 5-fold CV / 100%-data plan below (still valid,
+   but a +0.01-0.02 refinement, not a path to top 10 on its own).
+
+**Process lesson worth keeping**: our engineering rigor was real (rejected
+leaked datasets, reported failed experiments honestly, caught a real
+submission bug), but we optimized in isolation for days without ever
+checking what the field was doing. Check the leaderboard distribution and
+public work EARLY, not after a week of local iteration.
+
 ## ENDGAME PLAN (written 2026-09-05, ~6.7 weeks to the 2026-10-22 deadline)
 
 **Budget framing**: ~6.7 weeks x 30 GPU-h/week = **~200 GPU-hours total left**.
