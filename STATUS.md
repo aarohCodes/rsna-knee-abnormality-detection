@@ -481,11 +481,26 @@ compatible. If we win using a CC-BY-NC-SA component, we may be unable to grant
 what the competition requires. Also NC (NonCommercial) is at least arguable when
 competing for a $77,000 prize pool.
 
-**Action before any RadImageNet use ships**: verify the true upstream RadImageNet
-license (Mount Sinai's original release has historically been non-commercial
-research use, which would contradict the MIT claim). Prefer the copy with real
-provenance, and confirm upstream directly rather than trusting either uploader's
-tag. Do NOT assume MIT just because one description says so.
+**RESOLVED 2026-09-05 (as far as it can be) -- decision: PROCEED, eyes open.**
+Checked the authoritative source (github.com/BMEII-AI/RadImageNet). Findings:
+the GitHub repo carries an **MIT license file, but that covers the repo CODE**;
+the pretrained **weights are distributed separately via Google Drive**, and
+dataset access requires a request through radimagenet.com. So the "MIT" claim in
+shigechan's description most likely conflates the repo's code license with the
+weights' terms. **Neither uploader's tag is actually verified.**
+
+Practical read, stated as a judgment call rather than a clean resolution:
+- The competition's own test for external resources is "publicly available and
+  equally accessible at no cost." RadImageNet weights plainly meet that, and
+  effectively the entire top of the leaderboard uses them openly.
+- The residual risk is narrow and only bites in the WINNING scenario: whether we
+  could grant CC-BY-NC 4.0 over a solution containing a possibly-ShareAlike
+  component. That risk applies identically to every team at the top.
+- Therefore: proceed, but (a) prefer `shigechan/...` (pinned HF revision +
+  SHA256 = real provenance) over `marwanmath/...` (no description), (b) record
+  the dependency and its license ambiguity in any writeup, and (c) if we place,
+  raise the licensing question with the hosts openly rather than hiding it.
+Do NOT silently assume MIT.
 
 **`tonylica/...0917-repro-assets`** (2.6GB, 3,778 downloads) is the largest
 shortcut available -- a verified 0.917 reproduction -- but has an unspecified
