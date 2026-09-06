@@ -31,6 +31,65 @@ code disclosure only if we win).
    have not seen; never select an unverified config.
 3. If bee lands ~0.937, the gap to rank 10 is ~0.013.
 
+### BREAKTHROUGH LEAD (2026-09-06, ~21:00): we were missing a whole model arm
+
+Applied the "look outward first" lesson immediately after the compaction and it
+paid off within minutes. Two things published TODAY that we had never seen:
+
+**1. `mattiaangeli/bend-the-knee-to-the-dinosaurs-all-public` (58 votes, run
+16:32 UTC today).** The author republished the dinosaurs notebook with **every
+dataset source public** -- that is what "ALL PUBLIC" means in the title.
+
+Diffed it against our `submission_dinosaurs` fork:
+- the first 26 code cells are **byte-identical** to ours (ours has one extra
+  cell: our integrity guard). So the code was never the problem.
+- their metadata lists **12** dataset sources; ours listed **11**. The one we
+  lacked is **`mattiaangeli/rsna-knee-coat-resgated-ep10-top3`** -- a CoAtNet
+  RMLP-2 + finding-gated-residual arm with three checkpoints (e04/e06/e08).
+
+**Why this matters and why it was invisible.** In cell 25 the coat arm runs
+inside `try: _coat_substitute() except Exception: restore public raptor arm`.
+With the dataset unattached the manifest lookup raises, the notebook prints
+`[coat-arm] unavailable`, and it carries on producing a perfectly healthy-looking
+submission. That arm is blended into `_raptor.csv` at `private_alpha=0.40`, and
+`_raptor.csv` then enters the final blend at weight 0.60 -- so **the missing arm
+was worth 0.60 x 0.40 = 24% of the final ranking**. Textbook silent degradation:
+exactly the failure mode the 0.500 bug taught us to hunt for.
+
+**Verified before dispatch (per the pinned remote-artifact lesson):**
+- `mattiaangeli/rsna-knee-coat-resgated-ep10-top3` is public and listable, CC0-1.0.
+- Downloaded `coat_resgated_ep10_top3_manifest.json` and hashed it:
+  `98511a8f...3f284e` == the notebook's `MAN_SHA`. **Match.**
+- Downloaded the pinned wheel and hashed it: `236c8df5...75a7a9` == `WHL_SHA`.
+  **Match.** Both hash gates in `_coat_substitute` will therefore pass.
+
+**Built and pushed `aarohnanoti/rsna-knee-dinosaurs-v2`**: identical notebook,
+`dataset_sources` now matching the author's 12 exactly (verified by list
+equality), plus a new guard line that prints `COAT_ARM_STATUS=OK|MISSING` by
+checking for `/kaggle/working/_coat_raptor_blend_receipt.json`. Never again
+let that arm vanish quietly. All code cells `ast.parse`-checked before push.
+
+**2. `yosukeinada/rsna-knee-0-937-22-submissions-6-lessons`** -- another team's
+full 22-submission ledger. Independent corroboration of three of our findings,
+plus one that reframes the 0.028 gap:
+- They **reproduced the public base at 0.936**. We reproduced the same lineage at
+  **0.922**. So a faithful reproduction really does score ~0.936 -- our shortfall
+  is a *defect in our reproduction*, mechanical and fixable, not a capability gap.
+- They ran the bee/V6 route with the **same private-checkpoint -> public-copy
+  substitution we did** and scored **0.937**. Direct corroboration for our
+  pending `rsna-knee-bee`.
+- Their own trained models added **nothing** to the public base (0.874 -> harmful,
+  0.910 -> neutral at every weight). Matches our three negative tests exactly.
+- Their Gold58-based forecast of 0.941 came in at 0.937. Gold58 deltas do not
+  predict LB -- another reason to trust only the clean 881-study holdout.
+
+**Related: the 0.922 kernel's own missing source.** `bend-the-knee-to-dinov3-ensembled`
+still lists **13** dataset sources whose **first is an empty string** -- Kaggle
+blanks references the caller cannot see, i.e. a private/deleted dataset. That
+fork can therefore never be reproduced faithfully by us, which is very likely the
+real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
+**it is the reproducible horse and v2 is our clean shot at it.**
+
 ### RESOLVED: RadImageNet licence -- it is MIT, no conflict (2026-09-06)
 
 Checked three independent sources; all agree the **pretrained weights** are MIT:
