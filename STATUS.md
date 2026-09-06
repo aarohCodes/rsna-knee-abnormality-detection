@@ -7,6 +7,41 @@ https://github.com/aarohCodes/rsna-knee-abnormality-detection (private -- kept
 private deliberately while the competition is active, per the rules requiring
 code disclosure only if we win).
 
+## >>> START HERE (2026-09-06 end of session) <<<
+
+**Banked public score: 0.922.** Rank 10 is 0.950. Deadline 2026-10-22.
+
+**THREE CANDIDATES ARE BUILT, VERIFIED AND WAITING FOR THE USER TO SUBMIT.**
+I cannot submit; only the user can click "Submit to Competition".
+
+| priority | kernel | expected |
+|---|---|---|
+| 1 | https://www.kaggle.com/code/aarohnanoti/rsna-knee-bee | **~0.937** (author documents 3 submissions at exactly 0.937; all his audits passed in our run) |
+| 2 | https://www.kaggle.com/code/aarohnanoti/rsna-knee-dinosaurs | unknown; newer notebook + 4 raptor families |
+| 3 | https://www.kaggle.com/code/aarohnanoti/rsna-knee-final-v1 | ~0.925-0.927 (holdout-validated 0.9242) |
+
+All three passed an integrity guard (no NaNs, no constant columns) added because
+two earlier submissions scored exactly 0.500 from a silent all-0.5 fallback.
+Submitting all three is safe: they are independent and the banked 0.922 stands
+regardless.
+
+**Searched thoroughly for better public bases** (by votes, by recency, by score in
+title). Nothing above 0.937 is published. `rsna-knee-bee` is the strongest
+available base.
+
+**Budget**: 13.5h GPU remaining this week, refreshing Saturdays at 30h. About six
+weeks left.
+
+**The single most important process lesson from this session**: checking what the
+ecosystem has published beats optimising what you already hold. Most of the day
+went into careful optimisation of one forked snapshot, which yielded at most
++0.005 and a declaration that the space was "exhausted". Two rounds of simply
+looking at recently-published kernels then found the raptor families and the
+0.937 notebook -- worth far more than every modelling experiment combined. Look
+outward first, and re-check periodically, because in a live competition the
+ecosystem moves under you.
+
+
 ## RESOLVED: GPU quota reset on schedule (2026-09-05T00:00:00)
 The prior blocker (weekly 30h GPU quota exhausted 2026-08-31) is over. Confirmed
 by successfully pushing `rsna-knee-base-multislice-fresh` today.
