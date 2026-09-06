@@ -452,6 +452,33 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## ITEM 6 (multi-slice) CLOSED -- no clear benefit (2026-09-05)
+
+`rsna-knee-base-multislice-fresh` finished: K=3, 6 epochs, FRESH from pretrained
+DINOv2-base, matching base v2's recipe exactly so K was the only variable.
+
+| | tier1 (n=871) | tier2 (n=11) |
+|---|---|---|
+| base v2 (K=1, 6ep) | **0.7931** | 0.7774 |
+| multislice fresh (K=3, 6ep) | 0.7866 | **0.8028** |
+
+tier1 slightly WORSE; tier2 the best ever recorded, but tier2 is n=11 -- a single
+study flipping swings it hugely, so it cannot carry a decision. **This is the
+SIXTH attempt to beat v2's tier1 and, like the five before it, it lands in the
+0.77-0.79 band. v2's 0.7931 remains unbeaten.** Verdict: multi-slice does not
+clearly help; do not spend more GPU on it as a solo-accuracy lever.
+
+Caveat worth keeping: for ENSEMBLE purposes a member can add value by being
+*different* even when not individually better, so the K=3 checkpoint may still
+earn a place as a diversity member later. Just not worth further tuning now.
+
+Cost note: ran 6h25m, not the estimated 5h45m (epochs ~3,465s vs ~3,040s
+projected). Budget estimates for K>1 runs should use ~3,500s/epoch.
+
+**GPU budget after this run: 6.42h used, 23.58h remaining, refresh
+2026-09-12T00:00:00. TPU: 20.00h COMPLETELY UNUSED** -- the public notebook has a
+TPU stage (raidium/curia-2), so TPU is a genuinely untapped second budget.
+
 ## ASSET LICENSE AUDIT (2026-09-05) -- resolve before shipping anything
 
 Same discipline that caught the two leaked label datasets. Checked via
