@@ -452,6 +452,46 @@ multiple stages/slot layouts in the 0.95 cluster's pipeline; official
 ResNet-50 weights published by `marwanmath`). External MRI datasets
 (MRNet/OAI) remain deferred -- still ask before starting those.
 
+## CONTAMINATION ALARM RESOLVED: 0.9178 IS HONEST (2026-09-06)
+
+Per-fold scores of the five public DINOv3 models, each scored alone on the 881
+fold-0 studies:
+
+| model idx | stored fold | macro AUC |
+|---|---|---|
+| 0 | 0 | 0.8963 |
+| 1 | 1 | 0.8841 |
+| 2 | 2 | 0.8952 |
+| 3 | 3 | **0.8669** (lowest) |
+| 4 | 4 | **0.9125** (highest) |
+
+**The automated verdict in that cell was MISCODED and said "CONTAMINATED". It is
+wrong -- ignore it.** It only tested whether the spread exceeded 0.02, which is
+too crude. The correct test is whether the fold-0 model is SYSTEMATICALLY LOWEST,
+because if folds 1-4 had memorised these studies they would all score above the
+clean fold-0 model.
+
+They do not. Fold 0 ranks THIRD of five, with folds 1 and 3 scoring below it.
+That is ordinary model-to-model variance, not a memorisation signature.
+
+This fits their training code exactly: it **hardcodes `va = grp == 0`** as the
+holdout, so all five variants most likely held out group 0 and "fold" is a
+seed/variant index rather than a rotating holdout. All five are clean here.
+
+**CONCLUSION: 0.9178 is an honest, uncontaminated measurement of the public
+DINOv3 member on unseen studies.** The five-model mean exceeding every individual
+member (0.867-0.913) is exactly the variance reduction genuine ensembling
+produces. The earlier alarm was worth raising and worth checking, but it was
+unfounded.
+
+Consequences:
+- The strategic conclusions drawn from 0.9178 stand: the cluster's strength is
+  real generalisation, not public-LB overfitting.
+- The blend number 0.9241 rests on an honest baseline. What remains confounded is
+  OUR side of it (base v2 trained on 706 of the 881), so the +0.0063 is still an
+  upper bound pending a clean retrain on their split.
+- Distance to the 0.94 governing target from the honest blend: about 0.016.
+
 ## BLEND TEST RESULT (2026-09-06): our member helps, but the number is confounded
 
 `rsna-knee-blend-test` v3, all on the 881-study clean holdout, vs silver:
