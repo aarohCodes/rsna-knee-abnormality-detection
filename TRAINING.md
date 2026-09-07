@@ -168,8 +168,10 @@ ViT and a conv net that disagree.
 Training alone changes nothing; the weights have to reach a scored kernel.
 
 ```bash
-# 1. predictions on the clean holdout (for choosing the weight)
-python training/infer_member.py --checkpoint runs/member/best.pt     --data-root /data/rsna --split train --study-ids holdout_ids.txt     --out member_holdout.csv
+# 1. predictions on the clean holdout (for choosing the weight).
+#    --holdout-fold 0 derives the 881-study community holdout in-process, so
+#    there is no id file to create or keep in sync.
+python training/infer_member.py --checkpoint runs/member/best.pt     --data-root /data/rsna --split train --holdout-fold 0     --out member_holdout.csv
 
 # 2. choose the blend weight honestly  (see "The gate" above)
 python training/blend_member.py choose-weight --base <base_holdout.csv>     --member member_holdout.csv --labels data/.../llm_labels_v4_blend.csv

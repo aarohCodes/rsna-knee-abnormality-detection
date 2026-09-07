@@ -103,7 +103,14 @@ def main(argv=None) -> int:
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--study-ids", default=None,
                     help="optional newline-delimited file of study ids (e.g. a holdout list)")
+    ap.add_argument("--holdout-fold", type=int, default=None,
+                    help="with --split train, restrict to this community fold "
+                         "(md5(report)%%5). Use 0 to reproduce the 881-study clean "
+                         "holdout without needing an id file.")
     args = ap.parse_args(argv)
+
+    if args.holdout_fold is not None and args.split != "train":
+        raise SystemExit("--holdout-fold only applies to --split train (test has no reports)")
 
     # Must match the cache the member trained on, or the member sees a different
     # world at inference than it did at training.
@@ -121,12 +128,28 @@ def main(argv=None) -> int:
     grouped = {k: g.to_dict("records") for k, g in ser.groupby("StudyInstanceUID")}
     series_root = root / f"{args.split}_series"
 
-    ids = pd.read_csv(root / f"{args.split}.csv", dtype=str)["StudyInstanceUID"].tolist()
+    meta = pd.read_csv(root / f"{args.split}.csv", dtype=str)
+    ids = meta["StudyInstanceUID"].tolist()
+
+    if args.holdout_fold is not None:
+        # Derive the community holdout in-process instead of relying on a
+        # hand-maintained id file that can silently drift from the split the member
+        # was actually trained against.
+        from member import community_fold
+        if "Report" not in meta.columns:
+            raise SystemExit("train.csv has no Report column; cannot derive the community fold")
+        keep = {sid for sid, rep in zip(meta["StudyInstanceUID"], meta["Report"].fillna(""))
+                if community_fold(rep) == args.holdout_fold}
+        ids = [s for s in ids if s in keep]
+        print(f"community fold {args.holdout_fold}: {len(ids)} studies", flush=True)
+
     if args.study_ids:
-        wanted = [l.strip() for l in Path(args.study_ids).read_text().splitlines() if l.strip()]
-        ids = [s for s in ids if s in set(wanted)]
+        wanted = {l.strip() for l in Path(args.study_ids).read_text().splitlines() if l.strip()}
+        ids = [s for s in ids if s in wanted]
     if args.limit:
         ids = ids[:args.limit]
+    if not ids:
+        raise SystemExit("no studies selected; check --split/--holdout-fold/--study-ids")
 
     model, px = load_member(Path(args.checkpoint), device)
     amp = torch.bfloat16 if (device.type == "cuda" and torch.cuda.is_bf16_supported()) else torch.float16
