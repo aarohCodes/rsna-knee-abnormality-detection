@@ -1,4 +1,4 @@
-# Status (last updated 2026-09-05)
+# Status (last updated 2026-09-07)
 
 Read this file first in any new session/after context compaction to get oriented.
 Full strategy/reasoning is in PLAN.md; this file is the living "where are we now."
