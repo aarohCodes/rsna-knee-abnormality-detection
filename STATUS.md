@@ -114,6 +114,37 @@ candidates, so it never empties the window list.
 `--slot-preset balanced`. Both are single-variable and both aim at the weak
 findings. Judge them by the blend delta, not standalone AUC.
 
+### PRE-DEADLINE CHECKLIST -- the last way to lose this by accident
+
+**Final submission selection closes 2026-10-22.** Kaggle lets you nominate 2
+submissions for the private leaderboard; if you nominate nothing it auto-selects
+by **public score**, which is precisely the quantity our own simulation says is
+inflated by selection. This is a real way to lose rank without making a single
+technical mistake.
+
+- [ ] **Nominate the two finals explicitly.** Never leave it to auto-selection.
+- [ ] **Never nominate a submission with no score.** `56062615` came back COMPLETE
+      with an EMPTY score (9h cap). An unscored run is worth nothing on the private
+      LB, and it sits in the submissions list looking like the others.
+- [ ] **Choose on the clean 881-study holdout, not the public LB.** Chasing
+      0.001-0.003 public movements is exactly the behaviour that manufactures the
+      ~+0.010 of inflation we are betting other teams carry.
+- [ ] **Prefer the more diverse ensemble** when two candidates are within ~0.003:
+      the private noise SD is 0.0033, so smaller gaps are not real.
+- [ ] **Submit the final candidates EARLY**, not on the last day. Scoring took
+      3-9h per submission on 2026-09-06, one submission failed on the cap, and the
+      queue will be far worse near the deadline.
+- [ ] **Keep GPU quota in reserve for the final week.** 30h/week, refreshes
+      Saturdays. If a fix is needed in the last week with no quota, we ship
+      whatever is already submitted.
+
+**Useful fact about how code competitions score**: the submission already ran over
+the FULL test set; the public score shows only the 30% slice. So each completed
+submission's private score is ALREADY DETERMINED and merely hidden -- there is no
+re-run at the deadline, and no further runtime risk for work already submitted.
+bee-v2's private score exists right now. The only open question is whether we can
+produce something better before 2026-10-22.
+
 ### *** ODDS, SIMULATED PROPERLY -- AND MY EARLIER ESTIMATES WERE WRONG *** (2026-09-07, ~07:30)
 
 Simulated the private shakeup using the 3,243 real public scores, the bootstrap-
