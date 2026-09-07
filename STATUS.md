@@ -202,6 +202,50 @@ where the bugs in this project have come from. Build it with the same discipline
 that worked: content-anchored edits, `ast.parse` before push, metadata parity
 check, and a save-run before any submission.
 
+### *** LEAN EFFICIENCY KERNEL BUILT AND VALIDATED *** (2026-09-07, ~09:00)
+
+`aarohnanoti/rsna-knee-lean-eff` -- built, save-run passed, **ready for the user
+to submit**. Aimed at the efficiency award, not the main LB.
+
+**What it is**: bee-v2 truncated to cells 0-3 plus our guard. Cell 3 already
+writes a complete valid submission before the raptor/coat stages, so this is a
+truncation, not surgery -- one content-anchored insert caps the member count.
+
+**Validated (0 errors):**
+```
+[lean] using 5 of 20 members, folds [0, 1, 2, 3, 4]
+<member>: fingerprint matches within 2.8e-06        (all five)
+legacy DINO aggregation written from five folds
+integrity check PASSED: 3 rows, no NaNs, no constant columns
+```
+The fingerprint checks are the important line: they prove each member runs under
+the preprocessing it trained with, a mismatch being the kind that loads fine and
+silently destroys accuracy.
+
+**A failure worth recording**: the first version took the first 4 members and died
+on `WeightsError: legacy branch requires five folds, found 4`. A downstream
+combiner requires all five folds. Fixed by selecting ONE MEMBER PER FOLD, which is
+the better selection anyway -- cross-fold members are the most decorrelated
+available, and decorrelation is what we measured as driving ensemble value.
+
+**Measured timings extrapolated to 1,322 studies:**
+| stage | measured | projected |
+|---|---|---|
+| DICOM decode | 0.9 s/study | ~20 min |
+| 5 members | 0.25 s/study/member | ~28 min |
+| fixed setup | ~44 s | ~1 min |
+| **total** | | **~49 min** |
+
+| candidate | AUC | runtime | efficiency |
+|---|---|---|---|
+| bee-v2 (submitted) | 0.938 | 8.25h | -1.149 |
+| **lean-eff** | ~0.90-0.92 est | ~0.8h | **~ -1.89** |
+
+**Next**: user submits it. Its public score is unknown (5 of 20 members), so the
+submission measures BOTH the score and the true runtime. Note the decode is 20 of
+the 49 minutes and is the floor unless the slot budget shrinks -- that is where
+any further efficiency gain would have to come from.
+
 ### EFFICIENCY BUILD: CELL MAP AND THE ONE BLOCKER (2026-09-07, ~08:30)
 
 Mapped both candidate kernels to find where a lean submission could be cut.

@@ -1,4 +1,4 @@
-# rsna-knee-lean-eff — NOT YET VALIDATED
+# rsna-knee-lean-eff — VALIDATED, ready to submit
 
 A lean kernel for the **efficiency leaderboard**, which is a separate award.
 
@@ -27,11 +27,31 @@ takes 8h15m. Its top 10 contains teams scoring 0.934–0.941, which we already m
 | bee-v2 as submitted | 0.938 | 8.25h | −1.149 |
 | this, if ~0.91 in ~40 min | 0.910 | 0.67h | **≈ −1.98** |
 
-## Before submitting — do these in order
+## Validation (done, 2026-09-07)
 
-1. **Save-run it** (does not cost a submission). Confirm it completes, the guard
-   passes, and note the runtime. Runtime is the whole point; measure it.
-2. **Trim datasets if mount time is significant.** It currently inherits all seven
+Save-run passed with 0 errors:
+
+```
+[lean] using 5 of 20 members, folds [0, 1, 2, 3, 4]
+<member>: fingerprint matches within 2.8e-06        (all five)
+legacy DINO aggregation written from five folds
+integrity check PASSED: 3 rows, no NaNs, no constant columns
+```
+
+The fingerprint checks matter: they prove each member runs under the preprocessing
+it was trained with — a mismatch loads without error and silently wrecks accuracy.
+
+A first attempt taking the first 4 members died on `legacy branch requires five
+folds, found 4`. Selection is now one member per fold, which satisfies that
+combiner and is the better choice anyway: cross-fold members are the most
+decorrelated available.
+
+Measured, extrapolated to 1,322 studies: decode ~20 min + 5 members ~28 min +
+~1 min fixed = **~49 min**, versus bee-v2's 8h15m.
+
+## Remaining tuning (optional)
+
+1. **Trim datasets if mount time is significant.** It currently inherits all seven
    of bee-v2's, but cells 0–3 likely need only `tonylica/...repro-assets`,
    `renta0426/...meniscus-bag-v1`, and the DINOv2 model. Dropping the three raptor
    datasets, the opencv wheel and the coat dataset would cut mount time — but only
