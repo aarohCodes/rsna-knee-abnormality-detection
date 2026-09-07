@@ -87,7 +87,21 @@ all passed. Metadata parity verified against the author's.
 | **raptor pass 2 (4 arms)** | 28s | **~3.4h** |
 | **total** | 223s | **~11.5h vs the 9h cap** |
 
-**DO NOT SUBMIT AS-IS.** This would very likely reproduce the `56062615` failure:
+**REVISED RECOMMENDATION: submit it, as a calculated one-slot test.** An earlier
+version of this note said DO NOT SUBMIT; that was too conservative. Reasons:
+- The projection is uncertain and has been wrong in BOTH directions (bee-v2
+  estimated 6h20m -> ran 8h15m; lean-eff estimated 49 min -> ran <=37 min).
+- **Submitting is the only way to measure the real runtime.** No save-run can.
+- Downside is bounded at ONE slot out of five a day.
+- Upside is 0.938 -> ~0.941, rank ~163 -> **~81** on this dense leaderboard.
+
+Neither raptor pass can be cheaply removed: cell 10 restores a pre-Rad state,
+which invalidates cell 6's raptor blend, so cell 12 must redo it. Cutting either
+means removing cells 6-9 (audits and the public0033 overlay included) from a 262KB
+interdependent notebook whose failure mode is silent. Not worth it for +0.003 when
+a single submission answers the question directly.
+
+The original concern still stands as the downside case:
 COMPLETE with no score, one slot wasted. Note the author is at 0.941, so either
 his submitted version differs from what is published, or he is accepting the risk,
 or my extrapolation from 3 placeholder studies is off -- all three are possible and
