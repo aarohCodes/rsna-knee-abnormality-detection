@@ -202,6 +202,46 @@ where the bugs in this project have come from. Build it with the same discipline
 that worked: content-anchored edits, `ast.parse` before push, metadata parity
 check, and a save-run before any submission.
 
+### EFFICIENCY BUILD: CELL MAP AND THE ONE BLOCKER (2026-09-07, ~08:30)
+
+Mapped both candidate kernels to find where a lean submission could be cut.
+
+**bee-v2 splits cleanly:**
+| cell | content | cost |
+|---|---|---|
+| 3 | the ENTIRE DINOv2 20-member stage; **writes a complete valid submission.csv** | ~4h (22 min decode + 3.7h members) |
+| 8 | raptor arms + coat | ~6h |
+| 9 | coat blend | ~1h |
+| 17 | our integrity guard | -- |
+
+(dinosaurs-v2 is the same shape: cells 14/18 DINOv2, cell 26 raptor+coat.)
+
+**The good news**: cell 3 already writes a complete `submission.csv` BEFORE the
+expensive stages run (confirmed in the log at 79.8s: "final submission.csv =
+weighted rank mean of 20 member(s)"). So a lean kernel is a **truncation**, not an
+edit -- cells 0-3 plus our guard. Low risk, no surgery inside cells.
+
+**The blocker**: 20 members costs ~3.7h, which is still far too slow. At 0.90 in
+4h the efficiency is ~-1.538, worse than simply submitting dinosaurs-v2. To be
+competitive we need ~1-4 members, i.e. ~30-60 min.
+
+**And there is no knob.** Searched cell 3: the only environment variables are
+`PUBLIC0033_WORK_DIR` and `PUBLIC0033_INPUT_ROOT`. The member loop lives inside
+`infer_from_package`, so limiting the member count requires a content-anchored
+edit inside a 43KB cell.
+
+**Useful accuracy anchor for sizing the build**: on the clean 881-study holdout, a
+SINGLE DINOv3 fold scores **0.8963** while the published 5-fold member scores
+0.9178. So one-to-a-few members lands around 0.89-0.92 -- which at ~40 min gives
+an efficiency near **-1.95**, versus our current **-1.149**.
+
+**Why this was scoped and not built tonight**: the edit is surgery inside another
+team's interdependent notebook, it cannot be validated cheaply (each save-run
+costs GPU and the failure mode is silent), and it needs a submission slot. That
+combination is exactly what produced the earlier bugs in this project. Build it
+with the user available, using the discipline that has worked: content-anchored
+edits, `ast.parse` before push, metadata parity check, save-run before submitting.
+
 ### PRE-DEADLINE CHECKLIST -- the last way to lose this by accident
 
 **Final submission selection closes 2026-10-22.** Kaggle lets you nominate 2
