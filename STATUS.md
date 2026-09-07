@@ -90,6 +90,45 @@ fork can therefore never be reproduced faithfully by us, which is very likely th
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
 
+### MEASURED: THE SHAKEUP NOISE FLOOR (2026-09-07, ~03:50)
+
+User directive: **focus purely on private-LB robustness** -- accept ~0.941
+public, and bet on top teams collapsing from public-set overfitting rather than
+on us climbing. Bootstrapped the real noise using the 881-study clean holdout
+(public DINOv3 member predictions vs steven silver labels, full macro AUC 0.9178,
+600 resamples, Mann-Whitney AUC):
+
+| test set | size | SD of macro AUC | 95% range width |
+|---|---|---|---|
+| public LB | ~397 | **0.0051** | 0.0197 |
+| private LB | ~925 | **0.0033** | 0.0127 |
+
+**What this justifies.** A team that made 22 submissions and kept the best sits
+about **+0.010 above its true skill** from selecting the max of 22 noisy draws
+(E[max of 22] ~ 2.0 SD x 0.0051). The `yosukeinada` ledger documents exactly 22;
+the notebook author describes chasing 0.001-0.003 movements. We have made 9,
+mostly genuinely different approaches rather than blend-weight tweaks, so we
+carry much less inflation into the private split.
+
+**Honest arithmetic.** That regression narrows our 0.014 gap to rank 10 down to
+~0.005-0.009. But **102 teams sit at 0.940+** and we would need to pass most of
+them. Robustness alone: likely silver, plausible gold, **top 10 ~5%** -- revised
+DOWN from ~10% because reproduction is now known to cap at ~0.941.
+
+**Consequences to hold to:**
+1. Select the final two on the clean 881-study holdout, NEVER on public LB.
+2. Do not spend submissions on blend-weight micro-tuning -- that is precisely the
+   behaviour that manufactures the +0.010 inflation we are betting against.
+3. Prefer more diverse ensembles over any single tuned config (variance
+   reduction is the whole thesis).
+
+**OPEN: the user has a second machine with 128GB RAM.** Training off-Kaggle is
+fully rules-legal (only the SUBMISSION must be a kernel; weights ship as a
+Dataset -- exactly what dreaddevelopment does per the A6000/H100 trainer names in
+the coat manifest). RAM is not the bottleneck; **GPU VRAM is**. If that machine
+has 24GB+ the training path reopens and this robustness-only strategy should be
+revisited. Awaiting the GPU spec.
+
 ### *** STRATEGIC PIVOT: THE PUBLIC-FORK CEILING IS ~0.941 *** (2026-09-07, ~03:30)
 
 Pulled the full public leaderboard (3,243 teams) and looked up the authors of
