@@ -90,6 +90,52 @@ fork can therefore never be reproduced faithfully by us, which is very likely th
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
 
+### PHASE 1 COMPLETE -- BOTH FREE LEVERS ARE NEGATIVE (2026-09-07, ~04:50)
+
+Ran the two zero-cost levers to closure. Both are honest negatives, which
+settles where the remaining value is.
+
+**1. Cross-lineage blending: NO NEW GAIN.** Scored all 27 local holdout
+prediction files, de-duplicated to 10 distinct clean members (excluded
+`their_fold1-4` -- those models may have trained on these holdout studies and
+would silently inflate any blend). Ran an honest protocol: select blend members
+on one half of the 881 studies, score on the other, both directions.
+
+| direction | blend | best single | delta |
+|---|---|---|---|
+| A->B | 0.9260 | 0.9219 | +0.0041 |
+| B->A | 0.9226 | 0.9190 | +0.0035 |
+| mean | **0.9243** | 0.9205 | +0.0038 |
+
+The two strongest members correlate at only 0.930, so blending genuinely helps.
+**BUT `final-v1` already scores 0.9242 on this same holdout** -- its 50/50 DINOv3
+rank blend IS this optimum. So this is a CONFIRMATION that 0.9242 is real and not
+an artifact of fitting weights on the evaluation set, **not new signal**. The
+community-lineage blend space is genuinely exhausted, as recorded earlier.
+
+**2. Better silver labels: NO GAIN AVAILABLE.** Agreement with the 58 gold
+studies (REJECTED leaked sources merged4/refined excluded throughout):
+
+| source | agreement with gold |
+|---|---|
+| **steven/v4_blend (already in use)** | **0.8173** |
+| pilkwang/v2 | 0.7953 |
+| 2-source consensus | 0.7939 (worse) |
+| 5-source majority vote | 0.6111 (much worse) |
+
+The two good sources disagree on only **4.8%** of cells, so consensus had little
+room to help. And with 58 gold studies, SE(agreement) = **0.0153** -- we could not
+detect a genuinely better source even if we built one. The label lever is blocked
+by VALIDATION CAPACITY, not by ideas.
+
+**CONCLUSION: the free levers are exhausted. The training track is the only
+remaining path to top 10.** Without it we sit at 0.936-0.941 (rank ~95-395) and
+P(top 10) stays ~5%, entirely dependent on other teams regressing off their
+public-set overfitting.
+
+**Therefore the GPU spec on the user's Linux box is the critical path.** Nothing
+else productive can start without it.
+
 ### MEASURED: THE SHAKEUP NOISE FLOOR (2026-09-07, ~03:50)
 
 User directive: **focus purely on private-LB robustness** -- accept ~0.941
