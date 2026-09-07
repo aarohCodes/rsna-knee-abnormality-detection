@@ -64,6 +64,30 @@ fi
 ls -1 "$DATA_ROOT" | head
 echo "train studies on disk: $(ls -1 "$DATA_ROOT/train_series" 2>/dev/null | wc -l)  (expect 4407)"
 
+echo
+echo "== 4. silver labels =="
+# These are NOT in the repo: /data/ is gitignored, and redistributing someone
+# else's dataset inside our tree would be poor provenance anyway. Pull them from
+# the original public source instead, so the file is authoritative.
+LABEL_DIR="$REPO/data/interim/label_sources/steven"
+mkdir -p "$LABEL_DIR"
+if [ ! -f "$LABEL_DIR/llm_labels_v4_blend.csv" ]; then
+  kaggle datasets download -d stevenleehans/rsna-knee-llm-report-labels -p "$LABEL_DIR" --unzip
+else
+  echo "already present, skipping"
+fi
+python - "$LABEL_DIR/llm_labels_v4_blend.csv" <<'EOF'
+import sys
+import pandas as pd
+LAB = ["ACL","MCL","Medial Meniscus","Lateral Meniscus","Medial OA","Lateral OA",
+       "PF OA","Effusion","Synovitis","Baker's","Contusion","Fracture"]
+d = pd.read_csv(sys.argv[1])
+missing = [c for c in LAB if c not in d.columns]
+if missing or len(d) < 4000:
+    raise SystemExit(f"silver labels look wrong: rows={len(d)} missing={missing}")
+print(f"silver labels OK: {len(d)} rows, all 12 label columns present")
+EOF
+
 cat <<EOF
 
 == next ==

@@ -25,13 +25,36 @@ path to top 10, and this runbook is that path.
 Our previous attempt scored **0.7735**. This is a rebuild, not a tweak, and it may
 fail — the point of the gate is that it fails in days rather than at the deadline.
 
+## Paths
+
+**Nothing here assumes a username or a drive.** Every path is either a
+command-line argument or derived from the script's own location, so the repo works
+from any directory on any machine. `/data/rsna` below is only an example — use
+whatever has ~600 GB free (`~/rsna`, `/mnt/big/rsna`, anything). Pick it once and
+pass the same value to all three commands.
+
+The only fixed location is `~/.kaggle/kaggle.json`, which the Kaggle CLI requires
+by convention. Copy it over from the Windows box (`C:\Users\aaroh\.kaggle\kaggle.json`):
+
+```bash
+mkdir -p ~/.kaggle && cp /path/to/kaggle.json ~/.kaggle/ && chmod 600 ~/.kaggle/kaggle.json
+```
+
 ## Steps
 
 ```bash
-git clone <this repo> && cd rsna-knee-abnormality-detection
-bash training/setup_linux.sh /data/rsna          # env + corpus download
+git clone https://github.com/aarohCodes/rsna-knee-abnormality-detection.git
+cd rsna-knee-abnormality-detection
+bash training/setup_linux.sh /data/rsna          # env + corpus + silver labels
 source .venv-linux/bin/activate
 ```
+
+The repo is private, so `git clone` will ask for GitHub credentials (use a
+personal access token, not your password).
+
+Run the later commands **from the repo root**, since `--silver` is a repo-relative
+path. `setup_linux.sh` downloads the silver labels there for you — they are not in
+git, because `/data/` is gitignored.
 
 `setup_linux.sh` refuses to continue if `nvidia-smi` fails or torch cannot see
 CUDA — without a working GPU this box is no better than Kaggle's T4s.
