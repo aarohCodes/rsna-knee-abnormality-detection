@@ -67,11 +67,19 @@ def main(argv=None) -> int:
     ap.add_argument("--px", type=int, default=336)
     ap.add_argument("--k-train", type=int, default=24)
     ap.add_argument("--k-eval", type=int, default=48)
-    ap.add_argument("--epochs", type=int, default=8)
+    # Defaults below are the raptor author's published training recipe
+    # (dreaddevelopment/knee-mri-training-the-twelve-finding-model): 16 epochs,
+    # head 1e-3, backbone 3e-5, ~3h on a single 4090 at 384px. They are the
+    # best-placed public author (0.941, rank ~81), so their settings are a far
+    # better starting point than anything I would guess.
+    ap.add_argument("--epochs", type=int, default=16)
     ap.add_argument("--batch", type=int, default=4)
-    ap.add_argument("--lr", type=float, default=3e-4, help="head LR")
-    ap.add_argument("--encoder-lr", type=float, default=2e-5,
+    ap.add_argument("--lr", type=float, default=1e-3, help="head LR")
+    ap.add_argument("--encoder-lr", type=float, default=3e-5,
                     help="encoder LR; far below the head's on purpose (see below)")
+    ap.add_argument("--topk", type=int, default=3,
+                    help="average the weights of the best K epochs (1 disables). "
+                         "Free at inference, unlike an ensemble.")
     ap.add_argument("--holdout-fold", type=int, default=0)
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--out", default="runs/member")
@@ -131,7 +139,17 @@ def main(argv=None) -> int:
     scaler = torch.amp.GradScaler(device.type, enabled=(device.type == "cuda" and amp_dtype == torch.float16))
     lossf = nn.BCEWithLogitsLoss(reduction="none")
 
+    def save_member(state, auc, epoch, preds):
+        torch.save({"model": state, "arch": args.arch, "px": args.px,
+                    "feat_dim": feat_dim, "holdout_auc": auc, "epoch": epoch},
+                   out / "best.pt")
+        pd.DataFrame(preds, columns=LABELS).assign(
+            StudyInstanceUID=ho["StudyInstanceUID"].values
+        )[["StudyInstanceUID"] + LABELS].to_csv(out / "holdout_predictions.csv", index=False)
+
     best, history, t0 = -1.0, [], time.time()
+    # (auc, epoch, cpu state dict) for the best few epochs, to average at the end
+    top_states: list[tuple[float, int, dict]] = []
     for epoch in range(1, args.epochs + 1):
         model.train()
         running = n = 0
@@ -158,15 +176,45 @@ def main(argv=None) -> int:
               f"holdout_macro_auc={auc:.4f}  gold={auc_gold:.4f}  {time.time()-t0:.0f}s", flush=True)
         if auc > best:
             best = auc
-            torch.save({"model": model.state_dict(), "arch": args.arch, "px": args.px,
-                        "feat_dim": feat_dim, "holdout_auc": auc, "epoch": epoch},
-                       out / "best.pt")
-            pd.DataFrame(p, columns=LABELS).assign(
-                StudyInstanceUID=ho["StudyInstanceUID"].values
-            )[["StudyInstanceUID"] + LABELS].to_csv(out / "holdout_predictions.csv", index=False)
+            save_member(model.state_dict(), auc, epoch, p)
+
+        if args.topk > 1:
+            cpu_state = {k: v.detach().to("cpu", copy=True) for k, v in model.state_dict().items()}
+            top_states.append((auc, epoch, cpu_state))
+            top_states.sort(key=lambda t: -t[0])
+            del top_states[args.topk:]          # bound host memory: K copies, not N
+
+    # Averaging the best few epochs' weights is the raptor author's trick. It costs
+    # nothing at inference -- one model, one forward pass -- unlike an ensemble, and
+    # it smooths the noise in whichever single epoch happened to peak on an 881-study
+    # holdout where the metric's own SE is ~0.005. Only adopted if it actually wins.
+    avg_auc = float("nan")
+    if args.topk > 1 and len(top_states) > 1:
+        keys = top_states[0][2].keys()
+        avg = {}
+        for k in keys:
+            v0 = top_states[0][2][k]
+            if v0.is_floating_point():
+                avg[k] = sum(s[2][k].float() for s in top_states) / len(top_states)
+                avg[k] = avg[k].to(v0.dtype)
+            else:
+                avg[k] = v0.clone()             # ints (counters/buffers) can't be averaged
+        model.load_state_dict(avg)
+        p_avg, t_avg = evaluate(model, dl_ho, device, amp_dtype)
+        avg_auc = macro_auc(t_avg, p_avg)
+        print(f"\nweight average of best {len(top_states)} epochs "
+              f"{[s[1] for s in top_states]}: holdout_macro_auc={avg_auc:.4f} "
+              f"(best single epoch {best:.4f})", flush=True)
+        if avg_auc > best:
+            best = avg_auc
+            save_member(avg, avg_auc, -1, p_avg)
+            print("  -> averaged weights win; saved as the member", flush=True)
+        else:
+            print("  -> averaging did not help; keeping the best single epoch", flush=True)
 
     (out / "history.json").write_text(json.dumps(
-        {"args": vars(args), "history": history, "best_holdout_auc": best}, indent=2, default=str))
+        {"args": vars(args), "history": history, "best_holdout_auc": best,
+         "weight_avg_auc": avg_auc}, indent=2, default=str))
 
     print("\n" + "=" * 68)
     print(f"  PHASE-2 GATE      our member          {best:.4f}")

@@ -90,6 +90,57 @@ fork can therefore never be reproduced faithfully by us, which is very likely th
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
 
+### OVERNIGHT SWEEP: 3 NEGATIVES AND A REAL BUG CAUGHT (2026-09-07, ~06:45)
+
+Re-ran the ecosystem check (the lesson that keeps paying) and found three new
+notebooks. Tested each claim rather than adopting it.
+
+**1. Label-correlation stacking: NEGATIVE (-0.0161 macro).**
+`busyaprime/the-rsna-knee-labels-are-not-independent` shows the 12 labels
+co-occur far beyond chance, and argues 12 independent heads leave signal on the
+table. The co-occurrence is REAL on our data (Contusion x Fracture lift 2.79,
+Lateral Meniscus x Lateral OA 2.17). But cross-fitted stacking -- predicting each
+label from all 12 model outputs -- made every label worse except Contusion
+(+0.0012, noise). Macro 0.9202 -> 0.9041. **The model already encodes the
+correlations; re-mixing its own outputs only adds overfitting.** A joint head
+trained end-to-end is a different (untested) proposition.
+
+**2. OA-aware rule labeler: NEGATIVE, badly.**
+`busyaprime/osteoarthritis-is-almost-never-written-as-oa` argues OA labels are
+near chance because radiologists write osteophytes / joint space narrowing /
+gonarthrose, never "OA". Correct in principle, and directly aimed at PF OA (our
+2nd weakest). Graded their emitted `silver_labels.csv` against the 58 gold:
+
+| | macro AUC vs gold |
+|---|---|
+| **steven/v4_blend (in use)** | **0.8927** |
+| their rule labeler | 0.7266 |
+
+**Steven wins on all 12 labels**, including OA specifically (0.8887 vs 0.7640).
+An LLM reading the report already handles the consequence vocabulary; a
+hand-built multilingual lexicon does not catch up. Also a useful cross-check:
+steven's 0.8927 matches the 0.8932 recorded in this file long ago.
+**That is now THREE label sources tested and rejected. The label track is closed.**
+
+**3. The raptor author's TRAINING notebook -- and it caught a real bug of mine.**
+`dreaddevelopment/knee-mri-training-the-twelve-finding-model` publishes the actual
+recipe of the best-placed public author (0.941, rank ~81):
+- 16 epochs, head LR **1e-3**, backbone LR **3e-5**, ~3h on ONE 4090 at 384px
+- weight-average the best 3 epochs ("costs nothing at inference, unlike an ensemble")
+- soft labels, not hard
+- **"each epoch sees a different view of the same study. Nothing else is augmented."**
+
+**Our trainer had a random horizontal flip.** That is actively harmful here:
+mirroring a knee swaps medial and lateral compartments, and 4 of the 12 findings
+are defined by compartment (Medial/Lateral Meniscus, Medial/Lateral OA) --
+including Lateral Meniscus, our 3rd weakest. Removed. Also aligned LRs (was
+3e-4/2e-5), epochs (was 8), and implemented top-k weight averaging, which
+evaluates the average and only adopts it if it beats the best single epoch.
+
+**Known gap recorded**: our cache does not normalise knee laterality. Neither does
+the raptor recipe, and it reaches 0.941, so it is not fatal -- but it is a real
+candidate lever and worth an A/B once the gate passes.
+
 ### *** NEW BEST: bee-v2 = 0.938, RANK ~163 *** (2026-09-07, ~06:20)
 
 `56063873` (bee-v2 = author's V9 four-view contract + the recovered CoAtNet

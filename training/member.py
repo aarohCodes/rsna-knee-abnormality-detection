@@ -122,8 +122,12 @@ class StudyWindows(Dataset):
         x = torch.from_numpy(wins)
         if x.shape[-1] != self.px:
             x = F.interpolate(x, size=(self.px, self.px), mode="bilinear", align_corners=False)
-        if self.train and self.rng.random() < 0.5:
-            x = torch.flip(x, dims=[-1])          # left/right knee symmetry
+        # NO horizontal flip. It looks like free augmentation and is actively harmful
+        # here: mirroring a knee swaps the medial and lateral compartments, and four of
+        # the twelve findings (Medial/Lateral Meniscus, Medial/Lateral OA) are defined by
+        # which compartment they sit in. The raptor author's training notebook says the
+        # same thing from the other direction -- window sampling is the ONLY augmentation
+        # they use. Slice jitter in _centres() is that augmentation.
         x = (x - IMAGENET_MEAN) / IMAGENET_STD
         return x, torch.from_numpy(self.y[i]), torch.from_numpy(self.w[i])
 

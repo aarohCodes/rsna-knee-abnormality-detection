@@ -71,7 +71,7 @@ python training/prep_cache.py --data-root /data/rsna --out /data/rsna/cache
 python training/train_member.py \
     --cache /data/rsna/cache --data-root /data/rsna \
     --silver data/interim/label_sources/steven/llm_labels_v4_blend.csv \
-    --arch vit_small_patch14_dinov2.lvd142m --px 336 --epochs 8 --batch 8
+    --arch vit_small_patch14_dinov2.lvd142m --px 336 --epochs 16 --batch 8
 ```
 
 Tune `--batch` to VRAM (each sample is `k_train` windows, so effective batch is
@@ -100,6 +100,30 @@ Tune `--batch` to VRAM (each sample is `k_train` windows, so effective batch is
 - **The split is the community's** (`md5(report) % 5`, holdout fold 0). Verified to
   reproduce their fold sizes exactly: 881 / 834 / 937 / 885 / 870. Any other split
   makes the 0.9178 comparison meaningless.
+
+
+## Where these settings come from
+
+The defaults are **the raptor author's published training recipe**
+(`dreaddevelopment/knee-mri-training-the-twelve-finding-model`). They are the
+best-placed public author on the leaderboard (0.941, rank ~81), so their numbers
+beat anything we would guess: 16 epochs, head LR 1e-3, backbone LR 3e-5, ~3 hours
+on a single 4090 at 384px, and weight-averaging the best 3 epochs.
+
+Two things we took from reading it that are easy to get wrong:
+
+- **No flip augmentation.** Mirroring a knee swaps the medial and lateral
+  compartments, and four of the twelve findings are defined by which compartment
+  they sit in (Medial/Lateral Meniscus, Medial/Lateral OA). Window-sampling jitter
+  is the only augmentation, by design. An earlier version of this script had a
+  random horizontal flip; it was removed.
+- **Soft labels, not hard.** Silver labels are probabilities and the loss expects
+  them; forcing every hedged sentence to 0/1 throws away the hedging.
+
+Known gap: the cache does **not** normalise knee laterality (left vs right). The
+raptor recipe we copied does not either, and it reaches 0.941, so this is not
+fatal -- but it is a real candidate lever, since consistent laterality is what
+makes the medial/lateral findings well-defined. Worth an A/B once the gate passes.
 
 ## Rules compliance
 
