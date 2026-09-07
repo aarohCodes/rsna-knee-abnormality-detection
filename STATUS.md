@@ -61,6 +61,35 @@ were worth +0.016, while every modelling idea measured <=0.002 or negative.
 concluding anything. Declining one on "risk" grounds cost nothing but nearly
 shipped a kernel that would have failed on submission.
 
+### lean-eff IS NEAR ITS OPTIMUM -- and that argues for a purpose-built member
+
+Checked whether the ~20 min of DICOM decode inside `lean-eff` can be cut. **It
+cannot, safely.** The slice count is not a notebook constant: it comes from
+`cfg['slices']` in each member's manifest, i.e. it is part of that member's
+preprocessing contract, and the pipeline VERIFIES it (`fingerprint matches within
+2.8e-06`, printed for all five). Changing it would either fail that check or
+silently run members under preprocessing they never trained on -- precisely the
+failure the fingerprint exists to catch.
+
+Member count is likewise floored at 5 by the five-fold combiner.
+
+**So `lean-eff` at ~-1.909 is close to the practical optimum of this approach.**
+
+**The useful consequence**: our OWN trained member carries no such constraint,
+because we define its contract. It could be built FOR the efficiency board:
+- fewer slices per slot (`--slot-preset` already parameterises this)
+- smaller backbone and lower resolution
+- accepting an AUC hit the metric prices at only **0.0504 per hour saved**
+
+At the measured marginal rate (1 minute ~ 0.00084 AUC), a member that runs in 15
+minutes at 0.88 scores `-0.88/0.454 + 900/32400 = -1.911` -- matching lean-eff --
+and one at 0.89 in 15 min beats it outright.
+
+**This gives the training track a THIRD purpose**, alongside main-LB blending and
+the 5-fold ensemble: a deliberately lean, purpose-built efficiency entry. Of the
+three, it is the one with the best odds, since the efficiency board's top 10 sits
+at accuracies we already reach and our <1% main-LB odds do not improve much.
+
 ### RESOLVED: selecting lean-eff costs NOTHING on the main LB (2026-09-07, ~08:30)
 
 The earlier entry framed efficiency-vs-main as a trade for a selection slot. **That
