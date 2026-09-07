@@ -61,6 +61,38 @@ were worth +0.016, while every modelling idea measured <=0.002 or negative.
 concluding anything. Declining one on "risk" grounds cost nothing but nearly
 shipped a kernel that would have failed on submission.
 
+### RESOLVED: selecting lean-eff costs NOTHING on the main LB (2026-09-07, ~08:30)
+
+The earlier entry framed efficiency-vs-main as a trade for a selection slot. **That
+framing was wrong, and the correction matters.**
+
+Kaggle's mechanic (confirmed by general Kaggle documentation, and Ryan Holbrook
+authored the same efficiency leaderboards for Feedback Prize 1 and 3): you select
+submissions, **the efficiency board scores your SELECTED ones**, and auto-selection
+falls back to best public score. Crucially, **your main-LB placement is the BEST of
+your selected submissions, not an average.**
+
+| selection | main LB | efficiency |
+|---|---|---|
+| bee-v2 + dinosaurs-v2 | best of the two | poor (-1.149) |
+| **bee-v2 + lean-eff** | **0.938, unchanged** | **strong (~-1.909)** |
+
+**So adding a fast, weaker submission to the second slot is nearly free.** The only
+cost is the opportunity cost: if `dinosaurs-v2` scores ABOVE 0.938, it deserves
+that slot on the main board instead.
+
+**RECOMMENDED SELECTION at the deadline:**
+1. The best-scoring main-LB submission (currently `bee-v2` 0.938).
+2. `lean-eff` (0.898 in <=37 min) -- unless a main-LB candidate beats 0.938, in
+   which case weigh <1% odds of top 10 against a genuinely competitive efficiency
+   placement.
+
+**Confidence**: high on the mechanism but NOT verified against this competition's
+own Efficiency Prize Evaluation page, which needs JS/auth (WebFetch returned only
+the page title; the board notebook merely displays a precomputed csv). The user
+should confirm on that page before the deadline. If it turns out the board uses
+best-AUC rather than selected, lean-eff never counts and this plan is void.
+
 ### lean-eff MEASURED: 0.898 in <=37 min -- and an important caveat (2026-09-07, ~08:15)
 
 `56071930` = `rsna-knee-lean-eff`, submitted 07:35, scored **0.898**, complete in
