@@ -14,16 +14,26 @@ path to top 10, and this runbook is that path.
 
 ## The gate — read this before spending a week
 
-`train_member.py` ends by printing a verdict:
+**Standalone AUC is not the gate.** Measured on this project's own data, a member
+scoring **0.8963** — well *below* the 0.9202 base — still added **+0.0026** to the
+blend, because its rank correlation with the base was only 0.843. What decides a
+member's worth is **decorrelation**, not raw score.
 
-| our holdout AUC | verdict |
+So the real gate is the blend delta, cross-fitted:
+
+```bash
+python training/blend_member.py choose-weight     --base  <base pipeline's holdout predictions.csv>     --member runs/member/holdout_predictions.csv     --labels data/interim/label_sources/steven/llm_labels_v4_blend.csv
+```
+
+| honest delta | verdict |
 |---|---|
-| **≥ 0.90** | Track is live. Scale to 5-fold and more backbones. |
-| 0.85–0.90 | Marginal. One tuning round, then re-gate. Do not scale. |
-| **≤ 0.85** | Stop. Revert to robustness-only and keep the banked 0.938. |
+| **> +0.002** | Ship it. Scale to 5-fold and more backbones. |
+| **≤ +0.002** | Stop the training track, keep the banked 0.938. |
 
-Our previous attempt scored **0.7735**. This is a rebuild, not a tweak, and it may
-fail — the point of the gate is that it fails in days rather than at the deadline.
+It splits the holdout, picks the weight on one half and scores it on the other,
+both directions, so the number it reports is not the one it fitted. Our previous
+attempt scored 0.7735 standalone, which is almost certainly too weak to help even
+decorrelated — but the blend test, not the standalone number, is what decides.
 
 ## Paths
 
@@ -132,6 +142,31 @@ notebook. Weights ship as a Kaggle Dataset attached to the inference kernel; thi
 is exactly what the top public teams do (their manifests name A6000 and H100
 trainers). Do not add any data source that is not publicly available to all
 entrants at no cost.
+
+
+## Getting a trained member into a submission
+
+Training alone changes nothing; the weights have to reach a scored kernel.
+
+```bash
+# 1. predictions on the clean holdout (for choosing the weight)
+python training/infer_member.py --checkpoint runs/member/best.pt     --data-root /data/rsna --split train --study-ids holdout_ids.txt     --out member_holdout.csv
+
+# 2. choose the blend weight honestly  (see "The gate" above)
+python training/blend_member.py choose-weight --base <base_holdout.csv>     --member member_holdout.csv --labels data/.../llm_labels_v4_blend.csv
+
+# 3. in the scored kernel: predict on test, then mix at the chosen weight
+python training/infer_member.py --checkpoint best.pt --out member_test.csv
+python training/blend_member.py apply --base submission.csv     --member member_test.csv --weight 0.25 --out submission.csv
+```
+
+Blending is by **rank**, not probability: AUC reads only the ordering, so
+probability averaging lets the most confident member dominate regardless of
+whether it is more correct.
+
+**Where it goes matters.** `bee-v2` spends ~8.2h of the 9h cap and cannot absorb a
+member. `dinosaurs-v2` runs ~4h and has ~5h spare, so it is the base to blend
+into. See STATUS.md.
 
 ## After a PASS
 

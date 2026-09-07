@@ -216,18 +216,32 @@ def main(argv=None) -> int:
         {"args": vars(args), "history": history, "best_holdout_auc": best,
          "weight_avg_auc": avg_auc}, indent=2, default=str))
 
-    print("\n" + "=" * 68)
-    print(f"  PHASE-2 GATE      our member          {best:.4f}")
-    print(f"                    public single member {PUBLIC_SINGLE_MEMBER:.4f}")
-    print(f"                    our previous attempt {OUR_PREVIOUS_ATTEMPT:.4f}")
-    print("-" * 68)
-    if best >= 0.90:
-        print("  VERDICT: PASS -- scale to 5-fold and more backbones.")
-    elif best >= 0.85:
-        print("  VERDICT: MARGINAL -- one tuning round, then re-gate. Do not scale yet.")
+    print("\n" + "=" * 72)
+    print(f"  our member           {best:.4f}")
+    print(f"  public single member {PUBLIC_SINGLE_MEMBER:.4f}")
+    print(f"  our previous attempt {OUR_PREVIOUS_ATTEMPT:.4f}")
+    print("-" * 72)
+    # Standalone AUC is NOT the real gate. Measured on this project's own data, a
+    # member scoring 0.8963 -- well BELOW the 0.9202 base -- still added +0.0026 to
+    # the blend, because its rank correlation with the base was only 0.843. What
+    # decides a member's worth is decorrelation, not raw score. So this prints
+    # guidance, and the actual decision comes from blend_member.py.
+    if best >= 0.88:
+        print("  Standalone score is in the useful range.")
+    elif best >= 0.82:
+        print("  Standalone score is low, but a decorrelated member can still add.")
     else:
-        print("  VERDICT: FAIL -- stop the training track, keep the banked score.")
-    print("=" * 68, flush=True)
+        print("  Standalone score is very low; a useful blend is unlikely.")
+    print()
+    print("  THE REAL GATE -- run this next, it measures what actually matters:")
+    print("    python training/blend_member.py choose-weight \\")
+    print(f"        --base <base pipeline's holdout predictions.csv> \\")
+    print(f"        --member {out / 'holdout_predictions.csv'} \\")
+    print(f"        --labels {args.silver}")
+    print()
+    print("    honest delta > +0.002  ->  ship it: scale to 5-fold and more backbones")
+    print("    honest delta <= +0.002 ->  stop the training track, keep the banked score")
+    print("=" * 72, flush=True)
     return 0
 
 
