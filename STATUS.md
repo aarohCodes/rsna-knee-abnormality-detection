@@ -90,6 +90,50 @@ fork can therefore never be reproduced faithfully by us, which is very likely th
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
 
+### RUNTIME BUDGET DECIDES WHERE OUR MEMBER CAN GO (2026-09-07, ~07:00)
+
+Measured the stage costs from the v2 save-run logs and projected to the real
+1,322-study test set. This settles a planning question that would otherwise have
+bitten us in October.
+
+**bee-v2 (0.938) is nearly out of runtime.** Its raptor stage logs cumulative
+26 / 36 / 44 / 64s over 3 studies for the 4 arms. Excluding first-arm warmup that
+is ~4.2s per study per arm:
+
+| stage | projected on 1,322 studies |
+|---|---|
+| 4 raptor arms | ~6.2h |
+| 20-member DINOv2 package | ~0.7h |
+| coat resgated arm | ~0.9h |
+| audits + overhead | ~0.4h |
+| **total** | **~8.2h vs the 9h cap** |
+
+That matches the observed ~8h15m end to end. **Headroom is under an hour.**
+
+**Consequence: our own trained member CANNOT be added to bee-v2.** A member needs
+its own forward pass over 1,322 studies (~1-2h), which would push bee-v2 past the
+cap and produce exactly the silent no-score failure that killed `56062615`.
+
+**Our member must go into `dinosaurs-v2` instead.** The plain dinosaurs run
+completed in ~3h05m; plus the coat arm that is ~4h, leaving **~5h of headroom** --
+ample for one or more of our own members.
+
+**Revised endgame shape:**
+| final slot | candidate | ceiling |
+|---|---|---|
+| A | `bee-v2` = 0.938 | fixed; no room to extend |
+| B | `dinosaurs-v2` + our trained member(s) | the one that can actually climb |
+
+So the training track's output has a specific destination, and it is the lighter
+kernel. Build the blend against dinosaurs-v2 from the start rather than
+discovering the runtime wall after the weights exist.
+
+**If more headroom is ever needed**: each raptor arm calls `build_study` and
+re-decodes the same DICOMs from scratch. Decoding once per study and reusing
+across the 4 arms would cut a large fraction of that 6.2h. That is a real
+optimisation, but it means editing their proven inference code, so it is a
+fallback rather than a first move.
+
 ### OVERNIGHT SWEEP: 3 NEGATIVES AND A REAL BUG CAUGHT (2026-09-07, ~06:45)
 
 Re-ran the ecosystem check (the lesson that keeps paying) and found three new
