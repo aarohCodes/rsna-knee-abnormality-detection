@@ -90,6 +90,62 @@ fork can therefore never be reproduced faithfully by us, which is very likely th
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
 
+### *** STRATEGIC PIVOT: THE PUBLIC-FORK CEILING IS ~0.941 *** (2026-09-07, ~03:30)
+
+Pulled the full public leaderboard (3,243 teams) and looked up the authors of
+every notebook we have been forking. **They are not in the top 10. They are next
+to us.**
+
+| team | rank | score |
+|---|---|---|
+| Dread Development (raptor author) | 95 | 0.941 |
+| Mattia Angeli (dinosaurs / ALL PUBLIC author) | 159 | 0.939 |
+| renta.k (0.937 weak-label author) | 176 | 0.938 |
+| prvsiyan (bee author) | 213 | 0.937 |
+| **us** | **395** | **0.936** |
+| Pilkwang Kim (original baseline) | 910 | 0.935 |
+
+**This FALSIFIES the claim recorded earlier in this file** that the 0.95 cluster
+is "~17 forks of the same lineage". It is not. The whole public-fork ecosystem
+saturates at **0.937-0.941**, and we are already at the top of it. Only **35
+teams exceed 0.945** and **7 exceed 0.950**. Those teams are running something
+that has never been published.
+
+**Consequence: careful reproduction cannot reach top 10.** It can reach ~0.941
+(author parity) and roughly rank 95-160. Everything beyond that requires signal
+the public ecosystem does not contain.
+
+**Hard constraint on out-training them**: the coat package manifest records its
+own trainers as `trainer_a6000_epochs01_06.py` and `trainer_h100_epochs07_10.py`
+on RTX A6000 and H100 80GB. Top teams train off-Kaggle on hardware we do not
+have. We have ~78 T4-hours to the deadline. Brute force is not available.
+
+**Score distribution for calibration:**
+| score | rank | pct |
+|---|---|---|
+| 0.954 | 1 | -- |
+| 0.950 | 7 | 0.2% |
+| 0.945 | 35 | 1.1% |
+| 0.940 | 102 | 3.1% |
+| 0.937 | 197 | 6.1% |
+| 0.936 | 371 | 11.4% |
+| 0.922 | 1173 | 36.2% |
+Note the density: +0.001 from 0.936 to 0.937 is worth **174 ranks**.
+
+**THE REVISED PLAN**
+1. Bank the reproduction gains (bee-v2, dinosaurs-v2) -> target author parity ~0.941.
+2. **Cross-lineage rank blending** -- the one untapped edge. Each author runs
+   mostly their OWN lineage; nobody blends bee x dinosaurs x raptor x renta and
+   validates it honestly. **The earlier "our contribution is CLOSED" finding does
+   NOT apply here**: that measured OUR WEAK member (0.77 clean) against their
+   0.92 ensemble. Blending two independently-strong public ensembles is a
+   different question and is untested. Constraint: the 9h cap -- bee alone runs
+   ~5-6h, so a merged kernel must deduplicate shared stages (both run the raptor
+   arms and the coat arm).
+3. Select the final two on the **clean 881-study holdout, never the public LB**.
+   Our real private-LB edge is that we have made 9 submissions where the
+   fork-race teams made 22+, so we carry far less public-set overfitting.
+
 ### *** NEW BEST: 0.936 *** (2026-09-07, ~02:45)
 
 `56062620` scored **0.936**, beating the banked 0.922 by **+0.014**. This is now
