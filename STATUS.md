@@ -10,7 +10,7 @@ code disclosure only if we win).
 ## >>> START HERE (updated 2026-09-06, ~20:30) <<<
 
 ### Current state
-- **Banked public score: 0.922.** Rank 10 on the public LB is 0.950. Deadline 2026-10-22.
+- **Banked public score: 0.936** (was 0.922; see NEW BEST section). Rank 10 on the public LB is 0.950. Deadline 2026-10-22.
 - **THREE SUBMISSIONS ARE PENDING** (submitted by the user 20:14-20:15):
   refs 56062615, 56062620, 56062626. They correspond to the three kernels below.
   Scoring re-runs each pipeline against the real 1,322-study test set, so it takes
@@ -89,6 +89,38 @@ blanks references the caller cannot see, i.e. a private/deleted dataset. That
 fork can therefore never be reproduced faithfully by us, which is very likely the
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
+
+### *** NEW BEST: 0.936 *** (2026-09-07, ~02:45)
+
+`56062620` scored **0.936**, beating the banked 0.922 by **+0.014**. This is now
+our best public score and the first real move since 0.922.
+
+| ref | score |
+|---|---|
+| 56062626 | 0.909 (regression, do not select) |
+| **56062620** | **0.936 <- new best** |
+| 56062615 | pending |
+| 56063873 (bee-v2) | pending |
+
+**Attribution (INFERRED, not confirmed)**: 0.936 is almost certainly
+`rsna-knee-bee` (V8). The bee lineage was the documented 0.937, and the
+independent `yosukeinada` ledger records reproducing "a public **0.936**
+baseline" -- an exact match to what we just scored. That also implies 0.909 is
+the degraded `rsna-knee-dinosaurs` (missing the CoAtNet arm) rather than
+`rsna-knee-final-v1`, whose holdout predicted 0.9242. If so, 56062615 is
+final-v1 and should land near 0.925. **Confirm on the Kaggle Submissions page
+before relying on this.**
+
+**What this establishes**: reproducing the strongest published work faithfully is
+worth far more than optimising our own. 0.922 -> 0.936 came entirely from running
+someone else's better notebook correctly, not from any modelling of ours -- the
+same lesson recorded as this project's most important, now with a number on it.
+
+**Gap to rank 10 (0.950) is now 0.014**, down from 0.028.
+
+**Still pending and potentially better**: `bee-v2` is V9 = the exact scored
+0.937 four-view contract PLUS the CoAtNet resgated arm at alpha 0.40. If V9
+beats V8, it lands above 0.936.
 
 ### FIRST SCORE LANDED: 0.909 (2026-09-06, ~23:20)
 
