@@ -7,200 +7,59 @@ https://github.com/aarohCodes/rsna-knee-abnormality-detection (private -- kept
 private deliberately while the competition is active, per the rules requiring
 code disclosure only if we win).
 
-## >>> START HERE (updated 2026-09-06, ~20:30) <<<
+## >>> START HERE (rewritten 2026-09-07, ~09:15) <<<
 
 ### Current state
-- **Banked public score: 0.938** (bee-v2; rank ~163 of 3,243). Rank 10 on the public LB is 0.950. Deadline 2026-10-22.
-- **THREE SUBMISSIONS ARE PENDING** (submitted by the user 20:14-20:15):
-  refs 56062615, 56062620, 56062626. They correspond to the three kernels below.
-  Scoring re-runs each pipeline against the real 1,322-study test set, so it takes
-  time. A background watcher is running; if this session is gone, just re-check
-  with `kaggle competitions submissions rsna-knee-abnormality-detection`.
+- **Banked public score: 0.938** (`bee-v2`), **rank ~163 of 3,243 (top 5%)**.
+  Was 0.922 / rank ~1,173 the previous morning.
+- Deadline **2026-10-22**, 45 days out. The private LB does not exist until then.
 
-| kernel | basis | expectation |
+### Scores in, from the 2026-09-06 batch
+| ref | score | note |
 |---|---|---|
-| `rsna-knee-bee` | prvsiyan "bee's knees" V8, a documented 0.937 | **~0.937** (strongest) |
-| `rsna-knee-dinosaurs` | author's newer notebook + 4 raptor families | unknown, unvalidated |
-| `rsna-knee-final-v1` | our fork + corrected DINOv3 blend weight | ~0.925-0.927 (holdout said 0.9242) |
+| 56062620 | **0.936** | likely `bee` V8 -- superseded |
+| 56062626 | 0.909 | regression, never select |
+| 56062615 | **FAILED, no score** | hit the 9h cap. Never select an unscored run. |
+| 56063873 | **0.938** | `bee-v2` = V9 + recovered CoAtNet arm. **Current best.** |
 
-### What to do when the scores land
-1. Compare the three. Our clean holdout has predicted real scores within 0.003
-   (0.9194 predicted -> 0.922 actual), so public scores are a trustworthy
-   selection signal here -- no separate holdout run needed per candidate.
-2. Keep the best two for final selection in October. Never select on a number we
-   have not seen; never select an unverified config.
-3. If bee lands ~0.937, the gap to rank 10 is ~0.013.
+**Attribution of the first three to kernels was never confirmed** -- the API
+exposes no notebook reference. The Submissions page shows it; check there.
 
-### BREAKTHROUGH LEAD (2026-09-06, ~21:00): we were missing a whole model arm
+### THREE THINGS WAITING ON THE USER
+1. **Submit `rsna-knee-dinosaurs-v2`** -- validated, main LB, slot B's base.
+2. **Submit `rsna-knee-lean-eff`** -- validated, targets the **efficiency award**,
+   projected ~49 min vs bee-v2's 8h15m (efficiency ~-1.89 vs -1.149).
+3. **Start the Linux box** (top-tier NVIDIA GPU, 128GB RAM). `TRAINING.md` is the
+   runbook; the whole training track is built and locally tested.
 
-Applied the "look outward first" lesson immediately after the compaction and it
-paid off within minutes. Two things published TODAY that we had never seen:
+### The strategic picture, measured not guessed
+- **Public-fork ceiling is ~0.941.** The authors we fork rank 81-910. Reproduction
+  cannot reach top 10; this file previously claimed otherwise and was wrong.
+- **P(top 10) at 0.938 is <1%**; P(medal) ~44%. Simulated over the real 3,243
+  scores with bootstrap-measured private noise (SD 0.0033).
+- **0.948 makes top 10 a coin flip (50.8%).** That is +0.010, and it does not exist
+  in the public ecosystem.
+- **The efficiency award is far more winnable**: its top 10 holds teams scoring
+  0.934-0.941, which we already match. Runtime is worth ~29x the entire accuracy
+  spread. We rank 1350/3214 only because we submit 8-hour ensembles.
+- **Everything free is closed**: cross-lineage blending duplicates final-v1;
+  three label sources all lose to steven/v4_blend; label-correlation stacking
+  costs -0.0161.
 
-**1. `mattiaangeli/bend-the-knee-to-the-dinosaurs-all-public` (58 votes, run
-16:32 UTC today).** The author republished the dinosaurs notebook with **every
-dataset source public** -- that is what "ALL PUBLIC" means in the title.
+### Where the remaining points are
+Four weakest findings carry **+0.0168** of macro headroom: Contusion 0.8939,
+PF OA 0.8942, Lateral Meniscus 0.9047, MCL 0.9055. Two targeted levers exist,
+neither of which any forker will try:
+- `--slot-preset balanced` -- PF OA and MCL sit on the two most under-sampled planes
+- `--within-slot` -- ~13% of windows currently stack slices from different series
 
-Diffed it against our `submission_dinosaurs` fork:
-- the first 26 code cells are **byte-identical** to ours (ours has one extra
-  cell: our integrity guard). So the code was never the problem.
-- their metadata lists **12** dataset sources; ours listed **11**. The one we
-  lacked is **`mattiaangeli/rsna-knee-coat-resgated-ep10-top3`** -- a CoAtNet
-  RMLP-2 + finding-gated-residual arm with three checkpoints (e04/e06/e08).
-
-**Why this matters and why it was invisible.** In cell 25 the coat arm runs
-inside `try: _coat_substitute() except Exception: restore public raptor arm`.
-With the dataset unattached the manifest lookup raises, the notebook prints
-`[coat-arm] unavailable`, and it carries on producing a perfectly healthy-looking
-submission. That arm is blended into `_raptor.csv` at `private_alpha=0.40`, and
-`_raptor.csv` then enters the final blend at weight 0.60 -- so **the missing arm
-was worth 0.60 x 0.40 = 24% of the final ranking**. Textbook silent degradation:
-exactly the failure mode the 0.500 bug taught us to hunt for.
-
-**Verified before dispatch (per the pinned remote-artifact lesson):**
-- `mattiaangeli/rsna-knee-coat-resgated-ep10-top3` is public and listable, CC0-1.0.
-- Downloaded `coat_resgated_ep10_top3_manifest.json` and hashed it:
-  `98511a8f...3f284e` == the notebook's `MAN_SHA`. **Match.**
-- Downloaded the pinned wheel and hashed it: `236c8df5...75a7a9` == `WHL_SHA`.
-  **Match.** Both hash gates in `_coat_substitute` will therefore pass.
-
-**Built and pushed `aarohnanoti/rsna-knee-dinosaurs-v2`**: identical notebook,
-`dataset_sources` now matching the author's 12 exactly (verified by list
-equality), plus a new guard line that prints `COAT_ARM_STATUS=OK|MISSING` by
-checking for `/kaggle/working/_coat_raptor_blend_receipt.json`. Never again
-let that arm vanish quietly. All code cells `ast.parse`-checked before push.
-
-**2. `yosukeinada/rsna-knee-0-937-22-submissions-6-lessons`** -- another team's
-full 22-submission ledger. Independent corroboration of three of our findings,
-plus one that reframes the 0.028 gap:
-- They **reproduced the public base at 0.936**. We reproduced the same lineage at
-  **0.922**. So a faithful reproduction really does score ~0.936 -- our shortfall
-  is a *defect in our reproduction*, mechanical and fixable, not a capability gap.
-- They ran the bee/V6 route with the **same private-checkpoint -> public-copy
-  substitution we did** and scored **0.937**. Direct corroboration for our
-  pending `rsna-knee-bee`.
-- Their own trained models added **nothing** to the public base (0.874 -> harmful,
-  0.910 -> neutral at every weight). Matches our three negative tests exactly.
-- Their Gold58-based forecast of 0.941 came in at 0.937. Gold58 deltas do not
-  predict LB -- another reason to trust only the clean 881-study holdout.
-
-**Related: the 0.922 kernel's own missing source.** `bend-the-knee-to-dinov3-ensembled`
-still lists **13** dataset sources whose **first is an empty string** -- Kaggle
-blanks references the caller cannot see, i.e. a private/deleted dataset. That
-fork can therefore never be reproduced faithfully by us, which is very likely the
-real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
-**it is the reproducible horse and v2 is our clean shot at it.**
-
-### FOUND: ~13% OF ALL TRAINING WINDOWS ARE CORRUPTED (2026-09-07, ~07:45)
-
-The cached volume is five concatenated slots taken from **different series**. A
-3-slice window centred on a slot boundary stacks unrelated acquisitions into one
-RGB image -- e.g. centre 17 uses indices 16/17/18, crossing from the sagittal
-fluid-sensitive slot into the sagittal T1 slot.
-
-Measured on a fully-populated study:
-| preset | k=24 | k=48 | k=62 |
-|---|---|---|---|
-| raptor | 3/24 (12.5%) | 7/48 (14.6%) | 8/62 (12.9%) |
-| balanced | 2/24 (8.3%) | 6/48 (12.5%) | 8/62 (12.9%) |
-
-**The public raptor recipe has this defect too** (`_eval_centers` spans the whole
-volume), so every forked notebook carries it. Inheriting it is not a reason to
-keep it. Added `--within-slot` to `train_member.py`, which reads the slot layout
-from `cache_meta.json` and forbids straddling windows. Verified: 7/48 -> **0/48**.
-Falls back to the old behaviour for studies too sparse to supply 3 in-slot
-candidates, so it never empties the window list.
-
-**This is now the second targeted lever nobody forking will try**, alongside
-`--slot-preset balanced`. Both are single-variable and both aim at the weak
-findings. Judge them by the blend delta, not standalone AUC.
-
-### *** THE EFFICIENCY PRIZE IS FAR MORE WINNABLE THAN THE MAIN LB *** (2026-09-07, ~08:00)
-
-The competition has a **separate award category** for efficiency (confirmed in
-PLAN.md from RSNA's own press release). We have never optimised for it, and
-`ryanholbrook/rsna-knee-abnormalities-efficiency-lb` currently places us at
-**rank 1350 of 3214** on our stale 0.922 submission.
-
-`Efficiency = AUC/(Benchmark - maxAUC) + RuntimeSeconds/32400`, **minimised**.
-With Benchmark=0.5 and maxAUC~0.954 that is `-AUC/0.454 + t/32400`:
-
-| configuration | AUC | runtime | efficiency |
-|---|---|---|---|
-| bee-v2 (our best) | 0.938 | 8.25h | **-1.149** |
-| dinosaurs-v2 (projected) | 0.938 | ~4h | -1.622 |
-| hypothetical 0.952 in 4h | 0.952 | 4h | -1.652 |
-| **one trained member** | 0.900 | 0.5h | **-1.927** |
-| one trained member, better | 0.925 | 0.5h | **-1.982** |
-
-**One hour of runtime is worth +0.0504 AUC on this metric.** The ENTIRE
-leaderboard accuracy spread (0.922-0.954 = 0.032 AUC) is worth only **0.6 hours**
-of runtime. Runtime dominates completely: a single fast member at 0.900 beats a
-hypothetical 0.952 that takes four hours, by a wide margin.
-
-**Why this matters strategically.** Our two goals have very different odds:
-| target | requirement | odds |
-|---|---|---|
-| main LB top 10 | +0.010 AUC that does not exist publicly | **<1%** |
-| efficiency LB | a lean, fast, decent model | **much better** -- we are 1350th only because we submit 8-hour ensembles |
-
-The current efficiency top 10 includes teams at 0.934-0.941, i.e. scores we ALREADY
-MATCH -- they are simply fast. Our 0.938 is competitive on accuracy for that board;
-it is the 8h15m runtime that ruins it.
-
-**The training track now serves BOTH goals**, which roughly doubles its expected
-value: a single trained member may be too weak to crack main-LB top 10 alone, but
-is exactly the right shape for the efficiency board. Same work, two shots.
-
-**Caveats, stated honestly**: competitors' runtimes are not published, so only
-their ranks are known, not their exact efficiency scores; and `maxAUC` in the
-formula is the best PRIVATE AUC, unknown -- 0.954 (best public) is a proxy.
-Neither changes the direction or rough magnitude of the conclusion.
-
-**Concrete next step once a member exists**: submit it ALONE as a lean kernel
-(no raptor arms, no 20-member package) and measure both its LB score and its
-runtime. That is a cheap, independent shot at an award.
-
-### EFFICIENCY: THE CONCRETE TARGET AND THE BUILD (2026-09-07, ~08:15)
-
-Sensitivity table -- competitors' runtimes are NOT published, so this is a
-range, not a claim. At our current 0.938, how fast must we be to beat the
-efficiency leader (Scott Willis, 0.952)?
-
-| if the leader ran in | their efficiency | we need at 0.938 |
-|---|---|---|
-| 0.25h | -2.069 | impossible |
-| 0.5h | -2.041 | 13 min |
-| **1h** | -1.986 | **43 min** |
-| 2h | -1.875 | 103 min |
-| 4h | -1.652 | 223 min |
-
-**Runtime is ~29x more important than the entire accuracy spread**: accuracy from
-0.922 to 0.954 spans 0.031 efficiency points; 8 hours of runtime spans 0.889.
-
-**So for this prize we do NOT need a better model. We need a faster one at the
-accuracy we already have.** That is a different and far more achievable project
-than the +0.010 AUC the main LB demands.
-
-**Feasibility from bee-v2's own measured log**: DICOM decode ~1.3s/study
-(~29 min for 1,322) plus ONE member ~0.5s/study (~11 min) = **~40 min total**,
-squarely inside the winnable range. The 20-member package costs ~3.7h; a single
-member costs ~11 min. The decode is the floor, not the model.
-
-**THE BUILD (next concrete task, does NOT need the trained member):**
-A lean kernel that runs exactly one strong public member and nothing else --
-no raptor arms, no 20-member package, no coat arm, no audits.
-- Best candidate: the DINOv3 member from `mattiaangeli/knee-mri-fold-weights`,
-  which alone scored **0.9178** on the clean 881-study holdout.
-- Target: ~0.92 public in ~40-60 min -> efficiency around -1.95 to -1.98, versus
-  our current **-1.149**.
-- Keep the integrity guard (no NaNs, no constant columns).
-- This costs one submission slot and one validation run. It needs the user awake
-  to submit, so it is scoped here rather than built blind.
-
-**Risk to respect**: this is notebook surgery on someone else's pipeline, which is
-where the bugs in this project have come from. Build it with the same discipline
-that worked: content-anchored edits, `ast.parse` before push, metadata parity
-check, and a save-run before any submission.
+### Process lesson, now with numbers behind it
+**Checking what the ecosystem published beats optimising what you hold.** Every
+gain came from that: the silently-missing CoAtNet arm and the author's V9 config
+were worth +0.016, while every modelling idea measured <=0.002 or negative.
+**Corollary learned the hard way tonight**: validate with a cheap save-run before
+concluding anything. Declining one on "risk" grounds cost nothing but nearly
+shipped a kernel that would have failed on submission.
 
 ### *** LEAN EFFICIENCY KERNEL BUILT AND VALIDATED *** (2026-09-07, ~09:00)
 
