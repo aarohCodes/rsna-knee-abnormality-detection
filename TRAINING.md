@@ -164,33 +164,42 @@ from its standalone score. Two ViTs that agree with each other add far less than
 ViT and a conv net that disagree.
 
 
-## Two A/B levers, both single-variable
+## Three slot presets
 
-Both target findings the public recipe handles poorly, and neither exists in any
-forked notebook — everyone inherits the same defaults.
+| preset | slices | cache | purpose |
+|---|---|---|---|
+| `raptor` | 64 (32/20/12) | 27.7 GB | the public recipe, reproduced — the baseline |
+| `balanced` | 64 (24/24/16) | 27.6 GB | targets the weak findings (see below) |
+| `lean` | 32 (12/12/8) | **13.5 GB** | **for the efficiency prize** — halves decode and inference |
 
-**1. `--slot-preset balanced`** (on `prep_cache.py`). The public slot table gives
-sagittal 50% of slices, coronal 31%, axial 19%. Measured per-label AUC shows the
-two weakest findings are exactly the ones read on the two most under-sampled
-planes: PF OA (0.8942, axial/patella) and MCL (0.9055, coronal). `balanced` is
-24/24/16 instead of 32/20/12 — same 64 slices, so the comparison is clean.
+**`balanced`** exists because measured per-label AUC shows the two weakest findings
+are the ones read on the two most under-sampled planes: PF OA (0.8942, axial) and
+MCL (0.9055, coronal). Same 64 slices, so it is a clean single-variable test.
 
-**2. `--within-slot`** (on `train_member.py`). The cached volume is five
-concatenated slots from *different series*. A 3-slice window centred on a slot
-boundary stacks unrelated acquisitions into one RGB image — measured at
-**~13% of all windows** (7 of 48 at k_eval=48). `--within-slot` forbids that.
-The public recipe has the same defect; inheriting it is not a reason to keep it.
+**`lean`** exists because the efficiency prize is a separate award where runtime
+dominates: one hour is worth +0.0504 AUC, more than the entire leaderboard's
+accuracy spread (0.032). Our best public-weights efficiency entry scores ≈ −1.909
+(0.898 in ≤37 min) and cannot be made faster — its slice count is fixed by each
+member's verified preprocessing fingerprint. **A member we train ourselves has no
+such constraint.** At the measured marginal rate, a member running in 15 minutes
+at 0.89 beats that entry outright, which is a far easier target than the +0.010
+AUC main-LB top 10 requires.
 
-Run the baseline first so each lever has something to be compared against:
+## A second lever: `--within-slot`
+
+The cached volume is five concatenated slots from *different series*. A 3-slice
+window centred on a slot boundary stacks unrelated acquisitions into one RGB image
+— measured at **~13% of all windows**. `--within-slot` forbids that. The public
+recipe has the same defect; inheriting it is not a reason to keep it.
 
 ```bash
 # baseline (public recipe, reproduced)
 python training/train_member.py --cache /data/rsna/cache ... --out runs/base
-# lever 2 (no new cache needed)
+# within-slot windows (no new cache needed)
 python training/train_member.py --cache /data/rsna/cache ... --within-slot --out runs/withinslot
-# lever 1 (needs its own cache)
-python training/prep_cache.py --data-root /data/rsna --out /data/rsna/cache_bal --slot-preset balanced
-python training/train_member.py --cache /data/rsna/cache_bal ... --out runs/balanced
+# a different slot budget (needs its own cache)
+python training/prep_cache.py --data-root /data/rsna --out /data/rsna/cache_lean --slot-preset lean
+python training/train_member.py --cache /data/rsna/cache_lean ... --out runs/lean
 ```
 
 Judge each by the **blend delta** from `blend_member.py`, not by standalone AUC.

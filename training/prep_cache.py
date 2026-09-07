@@ -50,6 +50,14 @@ SLOT_PRESETS = {
                ("Coronal", 1, 12), ("Coronal", 0, 8), ("Axial", -1, 12)],
     "balanced": [("Sagittal", 1, 14), ("Sagittal", 0, 10),
                  ("Coronal", 1, 14), ("Coronal", 0, 10), ("Axial", -1, 16)],
+    # "lean" is for the EFFICIENCY prize, a separate award where runtime dominates:
+    # one hour is worth +0.0504 AUC, more than the entire leaderboard's accuracy
+    # spread (0.032). Halving the slice budget roughly halves both DICOM decode and
+    # inference. At the measured marginal rate (1 min ~ 0.00084 AUC), a member
+    # running in 15 min at 0.89 beats our current best efficiency entry outright.
+    # Proportions follow "balanced", since the weak findings are the same ones.
+    "lean": [("Sagittal", 1, 7), ("Sagittal", 0, 5),
+             ("Coronal", 1, 7), ("Coronal", 0, 5), ("Axial", -1, 8)],
 }
 SLOTS = SLOT_PRESETS["raptor"]
 MAXS = sum(s[2] for s in SLOTS)  # 64
