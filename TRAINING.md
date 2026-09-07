@@ -144,6 +144,25 @@ trainers). Do not add any data source that is not publicly available to all
 entrants at no cost.
 
 
+
+## Verified backbones
+
+Each of these was built with pretrained weights and pushed through a real forward
+pass at the stated resolution on this machine, so none of them will fail on
+arrival. Verified rather than assumed, because a patch-14 ViT at 336px is not its
+native geometry and would have been a plausible first-run crash.
+
+| arch | px | feat_dim | note |
+|---|---|---|---|
+| `vit_small_patch14_dinov2.lvd142m` | 336 | 384 | start here; closest to the public members |
+| `coatnet_rmlp_2_rw_384.sw_in12k_ft_in1k` | 384 | 1024 | **the 0.941 author's own backbone**; heaviest |
+| `convnext_small.in12k_ft_in1k` | 336 | 768 | third family, for decorrelation |
+
+They are three different architecture families (ViT / hybrid / pure conv), which
+matters: the blend test showed a member's value comes from **decorrelation**, not
+from its standalone score. Two ViTs that agree with each other add far less than a
+ViT and a conv net that disagree.
+
 ## Getting a trained member into a submission
 
 Training alone changes nothing; the weights have to reach a scored kernel.
