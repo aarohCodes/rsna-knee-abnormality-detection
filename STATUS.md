@@ -61,6 +61,47 @@ were worth +0.016, while every modelling idea measured <=0.002 or negative.
 concluding anything. Declining one on "risk" grounds cost nothing but nearly
 shipped a kernel that would have failed on submission.
 
+### lean-eff MEASURED: 0.898 in <=37 min -- and an important caveat (2026-09-07, ~08:15)
+
+`56071930` = `rsna-knee-lean-eff`, submitted 07:35, scored **0.898**, complete in
+**~37 minutes** wall-clock (which INCLUDES queue, so true runtime is lower).
+Beat my ~49 min projection.
+
+| | AUC | runtime | efficiency |
+|---|---|---|---|
+| bee-v2 | 0.938 | 8h15m | **-1.149** |
+| **lean-eff** | **0.898** | **<=37 min** | **~ -1.909** |
+
+Giving up 0.040 AUC bought back 7.6 hours: a **0.76 improvement** in efficiency
+score. The thesis is confirmed -- runtime dominates that metric.
+
+**THE CAVEAT THAT MATTERS (unresolved).** Which submission does the efficiency
+board score? Evidence says **the SELECTED one, which defaults to best public AUC**:
+our board row read `PublicScore 0.922` at a time when we also had an **0.812**
+submission from our own lighter pipeline that would have scored BETTER on
+efficiency (-1.678 vs -1.114). It showed 0.922 anyway.
+
+**So lean-eff's 0.898 does nothing for the efficiency board unless it is
+EXPLICITLY SELECTED at the deadline** -- which costs one of the two private-LB
+slots. That is a real strategic trade, not a free extra prize as I first framed it.
+
+**Could not verify**: the competition's "Efficiency Prize Evaluation" page needs
+JS/auth and `WebFetch` returned only the page title. The board notebook itself
+just displays a precomputed `leaderboard.csv` from
+`ryanholbrook/rsna-knee-abnormalities-efficiency-data`, so the logic is not
+readable from it either. **The user should read that page directly** -- it decides
+whether the efficiency track is worth a selection slot.
+
+**The trade, if selection is what counts:**
+| selection | main LB | efficiency |
+|---|---|---|
+| bee-v2 + dinosaurs-v2 | best shot (still <1% top 10) | poor (-1.149) |
+| bee-v2 + lean-eff | one strong main entry | strong (~-1.909) |
+
+Given P(top 10) on the main board is under 1%, spending the second slot on the
+efficiency track may well be the higher-expected-value choice -- but only if
+selection is the mechanism. Resolve that first.
+
 ### Lean kernel: datasets trimmed 7 -> 2, safe but NOT measurably faster
 
 Static analysis showed cells 0-3 reference only `tonylica/...repro-assets` and
