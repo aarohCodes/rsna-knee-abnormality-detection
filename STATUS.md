@@ -90,6 +90,52 @@ fork can therefore never be reproduced faithfully by us, which is very likely th
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
 
+### *** ODDS, SIMULATED PROPERLY -- AND MY EARLIER ESTIMATES WERE WRONG *** (2026-09-07, ~07:30)
+
+Simulated the private shakeup using the 3,243 real public scores, the bootstrap-
+measured private noise (SD 0.0033 at ~925 studies), 20,000 draws. Model: public
+score is an unbiased estimate of true skill, except that some fraction of a team's
+score ABOVE the 0.941 public-fork ceiling is selection inflation that evaporates.
+
+**At our current 0.938:**
+| assumption | P(top 10) | P(medal, top 324) |
+|---|---|---|
+| 0% of excess is fitting | **0.00%** | 44.1% |
+| 50% | **0.15%** | 44.3% |
+| 100% | **0.88%** | 45.8% |
+
+**I had told the user ~15% for top 10 and ~80% for a medal. Both were far too
+optimistic. The real figures at 0.938 are under 1% and ~44%.**
+
+**Why the earlier estimate was wrong**: I over-weighted regression to the mean.
+Even if EVERY point above 0.941 is pure public overfitting that fully evaporates,
+we still miss top 10 -- because the barrier is not the top 7, it is the **~150
+teams between us and rank 10**, most sitting at 0.940-0.941 with nothing to
+regress. Private noise reshuffles them; it does not remove them.
+
+**The threshold structure (50% inflation assumption):**
+| our public score | P(top 10) |
+|---|---|
+| 0.941 (fork ceiling) | 1.6% |
+| 0.945 | 18.8% |
+| **0.948** | **50.8%** |
+| 0.950 | 73.9% |
+
+**0.948 is the number that makes top 10 a coin flip.** That is **+0.010** over
+where we are, and it does not exist in the public ecosystem -- confirmed by the
+authors themselves ranking 81-910.
+
+**Strategic consequence, stated plainly:** the robustness-only path is worth ~0.2%
+for top 10 and ~44% for a medal. **Training is not merely the best remaining
+lever; it is essentially the only one.** Everything else -- blending, labels,
+reproduction -- is now measured and closed.
+
+**Caveats on the model** (all push in the pessimistic direction, so the numbers
+above are if anything generous): it ignores prevalence shift between public and
+private, which the competition explicitly warns about; and it treats teams'
+private noise as independent, whereas near-identical forked models will have
+CORRELATED errors, which reduces effective reshuffling further.
+
 ### RUNTIME BUDGET DECIDES WHERE OUR MEMBER CAN GO (2026-09-07, ~07:00)
 
 Measured the stage costs from the v2 save-run logs and projected to the real
