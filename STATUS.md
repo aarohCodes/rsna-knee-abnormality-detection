@@ -90,6 +90,34 @@ fork can therefore never be reproduced faithfully by us, which is very likely th
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
 
+### ONE SUBMISSION FAILED OUTRIGHT -- THE 9h CAP IS REAL (2026-09-07, ~05:30)
+
+`56062615` came back **COMPLETE with an EMPTY score**: the kernel died during the
+scored run and produced no valid submission.csv. Elapsed to failure ~9h05m, which
+points at the **9-hour runtime cap**.
+
+| ref | elapsed | result |
+|---|---|---|
+| 56062626 | ~3h05m | 0.909 |
+| 56062620 | ~6h30m | **0.936** |
+| 56062615 | ~9h05m | **FAILED, no score** |
+| 56063873 (bee-v2) | pending | -- |
+
+**Attribution still not established** (the API exposes no notebook reference), but
+the completion times constrain it: a ~3h pipeline, a ~6.5h pipeline, and one that
+hit the wall. `final-v1` runs 24 members plus a DINOv3 stage and is the most
+likely timeout candidate. CHECK THE SUBMISSIONS PAGE to settle it.
+
+**Consequences:**
+1. **An unscored submission is worth nothing on the private LB.** Never select one
+   of the final two from a run that did not complete with a score.
+2. The runtime risk flagged when adding the CoAtNet arm was real, but the
+   arithmetic still clears for both v2 kernels:
+   - `bee-v2` = V9 DROPS a raptor arm (~1.2h) and ADDS coat (~1h) -> ~neutral vs
+     bee V8's 6h30m.
+   - `dinosaurs-v2` = the ~3h pipeline + ~1h coat -> ~4h, comfortable.
+3. Any future candidate must be judged on runtime headroom, not just holdout AUC.
+
 ### *** WHERE THE POINTS ACTUALLY ARE: PER-LABEL WEAKNESS *** (2026-09-07, ~05:30)
 
 Macro AUC weights all 12 findings equally, so a weak finding costs exactly what a
