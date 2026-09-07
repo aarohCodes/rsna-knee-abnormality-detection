@@ -6,7 +6,7 @@ next to the 0.9178 a single public member scores on those same studies.
 
 ## Why this exists
 
-We are at 0.936 public (rank ~395 of 3,243). Reproducing public notebooks
+We are at 0.938 public (rank ~163 of 3,243, top 5%). Reproducing public notebooks
 saturates around **0.941** — the notebook authors themselves rank 95–910. Only 35
 teams exceed 0.945. Both free levers (cross-lineage blending, better silver
 labels) were measured and produced nothing. So training is the only remaining
@@ -20,7 +20,7 @@ path to top 10, and this runbook is that path.
 |---|---|
 | **≥ 0.90** | Track is live. Scale to 5-fold and more backbones. |
 | 0.85–0.90 | Marginal. One tuning round, then re-gate. Do not scale. |
-| **≤ 0.85** | Stop. Revert to robustness-only and keep the banked 0.936. |
+| **≤ 0.85** | Stop. Revert to robustness-only and keep the banked 0.938. |
 
 Our previous attempt scored **0.7735**. This is a rebuild, not a tweak, and it may
 fail — the point of the gate is that it fails in days rather than at the deadline.
@@ -94,7 +94,7 @@ Tune `--batch` to VRAM (each sample is `k_train` windows, so effective batch is
   tear are not visible on the same slice, and mean pooling dilutes the one
   informative window among dozens of uninformative ones. We measured that failure
   earlier in this project.
-- **Discriminative LR** — encoder at `2e-5`, head at `3e-4`. A self-supervised
+- **Discriminative LR** — encoder at `3e-5`, head at `1e-3`. A self-supervised
   encoder has no vocabulary for MR signal so it must adapt, but driving it at the
   head's LR while the head is still random destroys the pretrained features.
 - **The split is the community's** (`md5(report) % 5`, holdout fold 0). Verified to
