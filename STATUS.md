@@ -10,7 +10,7 @@ code disclosure only if we win).
 ## >>> START HERE (updated 2026-09-06, ~20:30) <<<
 
 ### Current state
-- **Banked public score: 0.936** (was 0.922; see NEW BEST section). Rank 10 on the public LB is 0.950. Deadline 2026-10-22.
+- **Banked public score: 0.938** (bee-v2; rank ~163 of 3,243). Rank 10 on the public LB is 0.950. Deadline 2026-10-22.
 - **THREE SUBMISSIONS ARE PENDING** (submitted by the user 20:14-20:15):
   refs 56062615, 56062620, 56062626. They correspond to the three kernels below.
   Scoring re-runs each pipeline against the real 1,322-study test set, so it takes
@@ -89,6 +89,38 @@ blanks references the caller cannot see, i.e. a private/deleted dataset. That
 fork can therefore never be reproduced faithfully by us, which is very likely the
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
+
+### *** NEW BEST: bee-v2 = 0.938, RANK ~163 *** (2026-09-07, ~06:20)
+
+`56063873` (bee-v2 = author's V9 four-view contract + the recovered CoAtNet
+resgated arm) scored **0.938**, completing in ~8h15m -- inside the 9h cap.
+
+| | score | rank of 3,243 |
+|---|---|---|
+| yesterday morning | 0.922 | ~1,173 |
+| last night | 0.936 | ~371 |
+| **bee-v2** | **0.938** | **~163 (top 5.0%)** |
+| prvsiyan (bee's own author) | 0.937 | ~197 |
+| Mattia Angeli | 0.939 | ~123 |
+| Dread Development | 0.941 | ~81 |
+
+**We are now ABOVE the author of the notebook we forked**, and within 0.003 of the
+best-placed notebook author. Rank moved **371 -> 163, up 208 places**.
+
+**Three things this settles:**
+1. **The recovered CoAtNet arm was real signal.** The silently-missing dataset was
+   worth finding; the whole +0.002 over bee V8 comes from it plus V9.
+2. **The author was right to revert V8.** V9's four-view contract beats the
+   five-view experiment, reproduced independently by us.
+3. **My runtime worry did not materialise.** I flagged honestly that bee-v2 at
+   7h35m was running past my "roughly neutral" estimate and might hit the wall
+   that killed 56062615. It completed at ~8h15m. The estimate was too optimistic
+   but the margin held. Treat all my 3-study runtime extrapolations as rough.
+
+**Gap to rank 10 (0.950) is now 0.012**, down from 0.028 yesterday morning.
+
+**Immediate next**: submit `dinosaurs-v2` -- validated, cap reset, and its ~4h
+projection now has evidence behind it since the coat arm demonstrably fits.
 
 ### ONE SUBMISSION FAILED OUTRIGHT -- THE 9h CAP IS REAL (2026-09-07, ~05:30)
 
