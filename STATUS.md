@@ -114,6 +114,52 @@ candidates, so it never empties the window list.
 `--slot-preset balanced`. Both are single-variable and both aim at the weak
 findings. Judge them by the blend delta, not standalone AUC.
 
+### *** THE EFFICIENCY PRIZE IS FAR MORE WINNABLE THAN THE MAIN LB *** (2026-09-07, ~08:00)
+
+The competition has a **separate award category** for efficiency (confirmed in
+PLAN.md from RSNA's own press release). We have never optimised for it, and
+`ryanholbrook/rsna-knee-abnormalities-efficiency-lb` currently places us at
+**rank 1350 of 3214** on our stale 0.922 submission.
+
+`Efficiency = AUC/(Benchmark - maxAUC) + RuntimeSeconds/32400`, **minimised**.
+With Benchmark=0.5 and maxAUC~0.954 that is `-AUC/0.454 + t/32400`:
+
+| configuration | AUC | runtime | efficiency |
+|---|---|---|---|
+| bee-v2 (our best) | 0.938 | 8.25h | **-1.149** |
+| dinosaurs-v2 (projected) | 0.938 | ~4h | -1.622 |
+| hypothetical 0.952 in 4h | 0.952 | 4h | -1.652 |
+| **one trained member** | 0.900 | 0.5h | **-1.927** |
+| one trained member, better | 0.925 | 0.5h | **-1.982** |
+
+**One hour of runtime is worth +0.0504 AUC on this metric.** The ENTIRE
+leaderboard accuracy spread (0.922-0.954 = 0.032 AUC) is worth only **0.6 hours**
+of runtime. Runtime dominates completely: a single fast member at 0.900 beats a
+hypothetical 0.952 that takes four hours, by a wide margin.
+
+**Why this matters strategically.** Our two goals have very different odds:
+| target | requirement | odds |
+|---|---|---|
+| main LB top 10 | +0.010 AUC that does not exist publicly | **<1%** |
+| efficiency LB | a lean, fast, decent model | **much better** -- we are 1350th only because we submit 8-hour ensembles |
+
+The current efficiency top 10 includes teams at 0.934-0.941, i.e. scores we ALREADY
+MATCH -- they are simply fast. Our 0.938 is competitive on accuracy for that board;
+it is the 8h15m runtime that ruins it.
+
+**The training track now serves BOTH goals**, which roughly doubles its expected
+value: a single trained member may be too weak to crack main-LB top 10 alone, but
+is exactly the right shape for the efficiency board. Same work, two shots.
+
+**Caveats, stated honestly**: competitors' runtimes are not published, so only
+their ranks are known, not their exact efficiency scores; and `maxAUC` in the
+formula is the best PRIVATE AUC, unknown -- 0.954 (best public) is a proxy.
+Neither changes the direction or rough magnitude of the conclusion.
+
+**Concrete next step once a member exists**: submit it ALONE as a lean kernel
+(no raptor arms, no 20-member package) and measure both its LB score and its
+runtime. That is a cheap, independent shot at an award.
+
 ### PRE-DEADLINE CHECKLIST -- the last way to lose this by accident
 
 **Final submission selection closes 2026-10-22.** Kaggle lets you nominate 2
