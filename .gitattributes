@@ -1,0 +1,8 @@
+# Shell scripts must keep LF endings: a CRLF .sh checked out on Linux fails with
+# "bad interpreter: /usr/bin/env bash^M". The training box is Linux, so this is
+# not cosmetic.
+*.sh text eol=lf
+# Python is run on both Windows and Linux; LF is safe on both and avoids noisy
+# whole-file diffs when the repo moves between them.
+*.py text eol=lf
+*.md text eol=lf
