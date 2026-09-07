@@ -61,6 +61,45 @@ were worth +0.016, while every modelling idea measured <=0.002 or negative.
 concluding anything. Declining one on "risk" grounds cost nothing but nearly
 shipped a kernel that would have failed on submission.
 
+### dinosaur-v4 FORKED AND VALIDATED -- BUT PROJECTED ~11.5h, OVER THE CAP (2026-09-07, ~17:00)
+
+`romantamrazov/rsna-knee-dinosaur-v4` (re-run 16:30 today, 153 votes) is the
+current kernel of **the best-placed public author (0.941, rank ~81)**, and its
+metadata now attaches **14 datasets -- a superset of both our forks**: the
+dinosaurs 12 PLUS the two bee ingredients (`tonylica/...repro-assets` and
+`renta0426/...meniscus-bag-v1`). **He has merged the two lineages** -- exactly the
+cross-lineage combination identified earlier as the untapped lever.
+
+Notably it has **no blank/private dataset entries**, unlike `bee` and
+`dinov3-ensembled`, so it is fully reproducible by anyone.
+
+**Forked as `aarohnanoti/rsna-knee-dinosaur-v4`; save-run PASSED with 0 errors** --
+infra0021 audit, public0033 overlay, PublicDual candidate, and our integrity guard
+all passed. Metadata parity verified against the author's.
+
+**BUT THE RUNTIME DOES NOT FIT.** It runs the raptor arms **twice**:
+
+| stage | measured (3 studies) | projected (1,322) |
+|---|---|---|
+| DINOv2 20-member package | 60s | ~3.7h |
+| raptor pass 1 (4 arms) | 57s | ~4.0h |
+| Rad-dual5 stages | 13s | ~0.4h |
+| **raptor pass 2 (4 arms)** | 28s | **~3.4h** |
+| **total** | 223s | **~11.5h vs the 9h cap** |
+
+**DO NOT SUBMIT AS-IS.** This would very likely reproduce the `56062615` failure:
+COMPLETE with no score, one slot wasted. Note the author is at 0.941, so either
+his submitted version differs from what is published, or he is accepting the risk,
+or my extrapolation from 3 placeholder studies is off -- all three are possible and
+the projection has been optimistic before (bee-v2 estimated 6h20m, ran 8h15m).
+
+**The obvious trim**: the second raptor pass feeds the optional
+`publiccoat_*` / `publicsynovitis_*` probe variants. If the PRIMARY output
+(`submission.csv` = PublicDual candidate) does not depend on it, dropping that
+pass saves ~3.4h and brings the total to ~8.1h -- inside the cap but with thin
+margin. **Verify that dependency before cutting**; it is surgery on interdependent
+cells, and the failure mode here is silent.
+
 ### lean-eff IS NEAR ITS OPTIMUM -- and that argues for a purpose-built member
 
 Checked whether the ~20 min of DICOM decode inside `lean-eff` can be cut. **It
