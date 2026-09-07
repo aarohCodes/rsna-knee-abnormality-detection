@@ -61,6 +61,24 @@ were worth +0.016, while every modelling idea measured <=0.002 or negative.
 concluding anything. Declining one on "risk" grounds cost nothing but nearly
 shipped a kernel that would have failed on submission.
 
+### Lean kernel: datasets trimmed 7 -> 2, safe but NOT measurably faster
+
+Static analysis showed cells 0-3 reference only `tonylica/...repro-assets` and
+`renta0426/...meniscus-bag-v1`; the three raptor weight sets, the opencv wheel and
+the coat dataset are baggage from the stages we removed. Trimmed and re-ran.
+
+| | wall | errors | members | guard |
+|---|---|---|---|---|
+| 7 datasets | 64.5s | 0 | 5, all folds | passed |
+| **2 datasets** | **64.1s** | 0 | 5, all folds | passed |
+
+**Identical within noise.** The trim is safe -- nothing resolves those datasets by
+a path the analysis missed -- but **it does not measurably change in-notebook
+runtime**, because Kaggle mounts datasets before the notebook starts and that time
+never appears in the log. Whether the efficiency metric's `RuntimeSeconds`
+includes setup is not documented anywhere I could check, so **do not count this as
+a speedup**. Kept because attaching unused multi-GB weights is wrong regardless.
+
 ### *** LEAN EFFICIENCY KERNEL BUILT AND VALIDATED *** (2026-09-07, ~09:00)
 
 `aarohnanoti/rsna-knee-lean-eff` -- built, save-run passed, **ready for the user
