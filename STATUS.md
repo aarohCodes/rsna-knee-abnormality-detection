@@ -90,6 +90,60 @@ fork can therefore never be reproduced faithfully by us, which is very likely th
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
 
+### *** WHERE THE POINTS ACTUALLY ARE: PER-LABEL WEAKNESS *** (2026-09-07, ~05:30)
+
+Macro AUC weights all 12 findings equally, so a weak finding costs exactly what a
+strong one does. Measured per-label AUC of the best member on the clean holdout:
+
+| finding | AUC | prev | SE | headroom to 0.95 |
+|---|---|---|---|---|
+| **Contusion** | 0.8939 | 19.4% | 0.0166 | +0.056 |
+| **PF OA** | 0.8942 | 48.4% | 0.0112 | +0.056 |
+| **Lateral Meniscus** | 0.9047 | 13.4% | 0.0189 | +0.045 |
+| **MCL** | 0.9055 | 18.0% | 0.0163 | +0.045 |
+| Lateral OA | 0.9126 | 26.9% | 0.0131 | +0.037 |
+| Effusion | 0.9150 | 60.6% | 0.0093 | +0.035 |
+| Synovitis | 0.9237 | 12.8% | 0.0175 | +0.026 |
+| Medial Meniscus | 0.9268 | 40.9% | 0.0100 | +0.023 |
+| Medial OA | 0.9327 | 36.3% | 0.0101 | +0.017 |
+| ACL | 0.9349 | 19.8% | 0.0132 | +0.015 |
+| Fracture | 0.9432 | 6.7% | 0.0211 | +0.007 |
+| Baker's | 0.9549 | 25.9% | 0.0098 | -0.005 |
+
+**Lifting only the four weakest to 0.95 is worth +0.0168 macro (0.9202 -> 0.9370)
+-- larger than our entire gap to top 10.** Improving the four strongest by 0.01
+each is worth only +0.0033. PF OA's SE is 0.0112, so its weakness is real signal,
+not sampling noise.
+
+**AND THERE IS A MECHANISM.** Compare the weak findings against the raptor slot
+budget's plane allocation:
+
+| plane | slices of 64 | findings that need it |
+|---|---|---|
+| Sagittal | 32 (50%) | ACL, menisci -- all scoring WELL |
+| Coronal | 20 (31%) | **MCL 0.9055** |
+| Axial | 12 (19%) | **PF OA 0.8942** (patellofemoral joint) |
+
+**The two most under-sampled planes carry the two weakest findings.** PF OA is
+read on axial slices through the patella and gets 19% of the budget; MCL is a
+coronal structure. Sagittal takes half the budget and carries the findings that
+already score best.
+
+**This is a targeted, testable edge that no forker will try**, because everyone
+inherits the same slot table from the same notebook. Implemented as
+`--slot-preset balanced` in `prep_cache.py`
+(sagittal 24 / coronal 24 / axial 16 vs raptor's 32/20/12), same 64 slices so the
+comparison is single-variable. Smoke-tested on 4 studies: valid cache, and it
+fills slightly MORE slots on a sparse study (40 vs 38) because it leans less on
+sagittal series some studies lack.
+
+**Caveat to hold**: these AUCs are measured against SILVER labels. Contusion,
+Effusion and Synovitis also have the worst silver-vs-gold agreement (0.737, 0.719,
+0.702), so part of their apparent weakness may be label noise rather than model
+weakness -- a model that denoises could score better on the real test set than on
+our holdout. PF OA and MCL do NOT have that excuse: their silver agreement is
+0.789 and 0.877, so their weakness is more likely real.
+
 ### PHASE 1 COMPLETE -- BOTH FREE LEVERS ARE NEGATIVE (2026-09-07, ~04:50)
 
 Ran the two zero-cost levers to closure. Both are honest negatives, which

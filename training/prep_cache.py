@@ -30,13 +30,28 @@ CROP_MM = 140.0
 CACHE_PX = 384
 SPAN_LO, SPAN_HI = 0.02, 0.98
 # (anatomical plane, Fluid_Sensitive preference, slice budget); -1 = don't care
-SLOTS = [
-    ("Sagittal", 1, 18),
-    ("Sagittal", 0, 14),
-    ("Coronal", 1, 12),
-    ("Coronal", 0, 8),
-    ("Axial", -1, 12),
-]
+#
+# "raptor" is the public recipe, reproduced exactly so our members stay comparable.
+# "balanced" is our own hypothesis, and it is motivated by a measurement rather than
+# a hunch. Per-label AUC of the best public member on the clean holdout shows the two
+# weakest findings are PF OA (0.8942) and MCL (0.9055) -- and those are precisely the
+# findings read on the two most under-sampled planes. PF OA lives on axial slices
+# through the patella, which get 12 of 64 slices (19%); MCL is a coronal structure,
+# and coronal gets 31%. Meanwhile sagittal takes half the budget and carries the
+# findings that already score best.
+#
+# Because macro AUC weights all 12 findings equally, lifting the four weakest to 0.95
+# is worth +0.0168 to the macro, while improving the four strongest by 0.01 each is
+# worth only +0.0033. So rebalancing toward the weak planes is the highest-leverage
+# change available -- and it is one no forker of the public ensemble will try, since
+# they all inherit this same table.
+SLOT_PRESETS = {
+    "raptor": [("Sagittal", 1, 18), ("Sagittal", 0, 14),
+               ("Coronal", 1, 12), ("Coronal", 0, 8), ("Axial", -1, 12)],
+    "balanced": [("Sagittal", 1, 14), ("Sagittal", 0, 10),
+                 ("Coronal", 1, 14), ("Coronal", 0, 10), ("Axial", -1, 16)],
+}
+SLOTS = SLOT_PRESETS["raptor"]
 MAXS = sum(s[2] for s in SLOTS)  # 64
 
 LABELS = [
@@ -175,7 +190,15 @@ def main(argv=None) -> int:
     ap.add_argument("--split", default="train", choices=["train", "test"])
     ap.add_argument("--limit", type=int, default=0, help="only process the first N studies (smoke test)")
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 4) - 1))
+    ap.add_argument("--slot-preset", default="raptor", choices=sorted(SLOT_PRESETS),
+                    help="'raptor' reproduces the public recipe; 'balanced' shifts budget "
+                         "toward coronal/axial to target the weakest findings (see above)")
     args = ap.parse_args(argv)
+
+    global SLOTS, MAXS
+    SLOTS = SLOT_PRESETS[args.slot_preset]
+    MAXS = sum(s[2] for s in SLOTS)
+    print(f"slot preset '{args.slot_preset}': {SLOTS}  -> {MAXS} slices/study", flush=True)
 
     root = Path(args.data_root)
     out = Path(args.out)
