@@ -87,6 +87,10 @@ def main(argv=None) -> int:
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--no-pretrained", action="store_true",
                     help="random init: for smoke tests only, never for a real run")
+    ap.add_argument("--within-slot", action="store_true",
+                    help="never let a 3-slice window straddle two slots. Without it "
+                         "~13%% of windows stack slices from different series into one "
+                         "RGB image. Single-variable A/B against the public recipe.")
     args = ap.parse_args(argv)
 
     out = Path(args.out)
@@ -112,11 +116,25 @@ def main(argv=None) -> int:
         print("ERROR: holdout is empty", file=sys.stderr)
         return 2
 
+    # Read the slot layout the cache was built with, so windows can be kept inside a
+    # single slot instead of straddling two different series (see StudyWindows).
+    slot_budgets = None
+    if args.within_slot:
+        meta_path = cache / "cache_meta.json"
+        if not meta_path.is_file():
+            print(f"ERROR: --within-slot needs {meta_path}, written by prep_cache.py",
+                  file=sys.stderr)
+            return 2
+        slot_budgets = [s[2] for s in json.loads(meta_path.read_text())["slots"]]
+        print(f"within-slot windows enabled; slot budgets {slot_budgets}", flush=True)
+
     wts = lambda d: np.repeat(d["weight"].to_numpy()[:, None], len(LABELS), 1)
     ds_tr = StudyWindows(cache, tr["StudyInstanceUID"], tr[LABELS].to_numpy(), wts(tr),
-                         k=args.k_train, px=args.px, train=True, seed=0)
+                         k=args.k_train, px=args.px, train=True, seed=0,
+                         slot_budgets=slot_budgets)
     ds_ho = StudyWindows(cache, ho["StudyInstanceUID"], ho[LABELS].to_numpy(), wts(ho),
-                         k=args.k_eval, px=args.px, train=False, seed=1)
+                         k=args.k_eval, px=args.px, train=False, seed=1,
+                         slot_budgets=slot_budgets)
     pin = device.type == "cuda"
     dl_tr = DataLoader(ds_tr, batch_size=args.batch, shuffle=True, num_workers=args.workers,
                        pin_memory=pin, drop_last=True, collate_fn=collate)

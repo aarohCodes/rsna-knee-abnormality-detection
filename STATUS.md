@@ -90,6 +90,30 @@ fork can therefore never be reproduced faithfully by us, which is very likely th
 real 0.028 gap for that lineage. The dinosaurs ALL-PUBLIC line has no blanks, so
 **it is the reproducible horse and v2 is our clean shot at it.**
 
+### FOUND: ~13% OF ALL TRAINING WINDOWS ARE CORRUPTED (2026-09-07, ~07:45)
+
+The cached volume is five concatenated slots taken from **different series**. A
+3-slice window centred on a slot boundary stacks unrelated acquisitions into one
+RGB image -- e.g. centre 17 uses indices 16/17/18, crossing from the sagittal
+fluid-sensitive slot into the sagittal T1 slot.
+
+Measured on a fully-populated study:
+| preset | k=24 | k=48 | k=62 |
+|---|---|---|---|
+| raptor | 3/24 (12.5%) | 7/48 (14.6%) | 8/62 (12.9%) |
+| balanced | 2/24 (8.3%) | 6/48 (12.5%) | 8/62 (12.9%) |
+
+**The public raptor recipe has this defect too** (`_eval_centers` spans the whole
+volume), so every forked notebook carries it. Inheriting it is not a reason to
+keep it. Added `--within-slot` to `train_member.py`, which reads the slot layout
+from `cache_meta.json` and forbids straddling windows. Verified: 7/48 -> **0/48**.
+Falls back to the old behaviour for studies too sparse to supply 3 in-slot
+candidates, so it never empties the window list.
+
+**This is now the second targeted lever nobody forking will try**, alongside
+`--slot-preset balanced`. Both are single-variable and both aim at the weak
+findings. Judge them by the blend delta, not standalone AUC.
+
 ### *** ODDS, SIMULATED PROPERLY -- AND MY EARLIER ESTIMATES WERE WRONG *** (2026-09-07, ~07:30)
 
 Simulated the private shakeup using the 3,243 real public scores, the bootstrap-

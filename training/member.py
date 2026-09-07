@@ -80,7 +80,7 @@ class StudyWindows(Dataset):
     """
 
     def __init__(self, cache_dir, study_ids, targets, weights, k=24, px=336,
-                 train=True, seed=0):
+                 train=True, seed=0, slot_budgets=None):
         self.cache = Path(cache_dir)
         self.ids = list(study_ids)
         self.y = np.asarray(targets, np.float32)
@@ -89,6 +89,14 @@ class StudyWindows(Dataset):
         self.rng = np.random.default_rng(seed)
         if len(self.ids) != len(self.y):
             raise ValueError("study id / target length mismatch")
+        # Which slot each cached slice index belongs to. With this set, a triplet is
+        # never allowed to span two slots. Without it, ~13% of windows stack slices
+        # from DIFFERENT series -- e.g. index 17/18/19 straddles the boundary between
+        # the sagittal fluid-sensitive slot and the sagittal T1 slot -- producing an
+        # RGB image whose three channels are unrelated acquisitions. The public
+        # raptor recipe has this defect too; inheriting it is not a reason to keep it.
+        self.slot_of = (np.concatenate([[i] * b for i, b in enumerate(slot_budgets)])
+                        if slot_budgets else None)
 
     def __len__(self):
         return len(self.ids)
@@ -99,6 +107,11 @@ class StudyWindows(Dataset):
             valid = np.arange(min(3, depth))
         lo, hi = int(valid.min()), int(valid.max())
         cand = [c for c in range(lo + 1, hi) if lo <= c - 1 and c + 1 <= hi]
+        if self.slot_of is not None and len(self.slot_of) >= depth:
+            same = [c for c in cand
+                    if self.slot_of[c - 1] == self.slot_of[c] == self.slot_of[c + 1]]
+            if len(same) >= 3:            # keep the old behaviour if a study is too sparse
+                cand = same
         if not cand:
             cand = [max(1, min((lo + hi) // 2, depth - 2))]
         if self.train and len(cand) > self.k:
