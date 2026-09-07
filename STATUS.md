@@ -160,6 +160,48 @@ Neither changes the direction or rough magnitude of the conclusion.
 (no raptor arms, no 20-member package) and measure both its LB score and its
 runtime. That is a cheap, independent shot at an award.
 
+### EFFICIENCY: THE CONCRETE TARGET AND THE BUILD (2026-09-07, ~08:15)
+
+Sensitivity table -- competitors' runtimes are NOT published, so this is a
+range, not a claim. At our current 0.938, how fast must we be to beat the
+efficiency leader (Scott Willis, 0.952)?
+
+| if the leader ran in | their efficiency | we need at 0.938 |
+|---|---|---|
+| 0.25h | -2.069 | impossible |
+| 0.5h | -2.041 | 13 min |
+| **1h** | -1.986 | **43 min** |
+| 2h | -1.875 | 103 min |
+| 4h | -1.652 | 223 min |
+
+**Runtime is ~29x more important than the entire accuracy spread**: accuracy from
+0.922 to 0.954 spans 0.031 efficiency points; 8 hours of runtime spans 0.889.
+
+**So for this prize we do NOT need a better model. We need a faster one at the
+accuracy we already have.** That is a different and far more achievable project
+than the +0.010 AUC the main LB demands.
+
+**Feasibility from bee-v2's own measured log**: DICOM decode ~1.3s/study
+(~29 min for 1,322) plus ONE member ~0.5s/study (~11 min) = **~40 min total**,
+squarely inside the winnable range. The 20-member package costs ~3.7h; a single
+member costs ~11 min. The decode is the floor, not the model.
+
+**THE BUILD (next concrete task, does NOT need the trained member):**
+A lean kernel that runs exactly one strong public member and nothing else --
+no raptor arms, no 20-member package, no coat arm, no audits.
+- Best candidate: the DINOv3 member from `mattiaangeli/knee-mri-fold-weights`,
+  which alone scored **0.9178** on the clean 881-study holdout.
+- Target: ~0.92 public in ~40-60 min -> efficiency around -1.95 to -1.98, versus
+  our current **-1.149**.
+- Keep the integrity guard (no NaNs, no constant columns).
+- This costs one submission slot and one validation run. It needs the user awake
+  to submit, so it is scoped here rather than built blind.
+
+**Risk to respect**: this is notebook surgery on someone else's pipeline, which is
+where the bugs in this project have come from. Build it with the same discipline
+that worked: content-anchored edits, `ast.parse` before push, metadata parity
+check, and a save-run before any submission.
+
 ### PRE-DEADLINE CHECKLIST -- the last way to lose this by accident
 
 **Final submission selection closes 2026-10-22.** Kaggle lets you nominate 2
