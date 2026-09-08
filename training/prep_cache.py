@@ -197,6 +197,11 @@ def main(argv=None) -> int:
     ap.add_argument("--out", required=True, help="output cache directory")
     ap.add_argument("--split", default="train", choices=["train", "test"])
     ap.add_argument("--limit", type=int, default=0, help="only process the first N studies (smoke test)")
+    ap.add_argument("--shard", default=None, metavar="I/N",
+                    help="process shard I of N (e.g. 1/2). Kaggle caps notebook output "
+                         "at ~20GB, so the full 27.7GB cache needs two CPU runs; the lean "
+                         "preset (13.5GB) fits in one. Shards are deterministic slices of "
+                         "the sorted study list, so they never overlap or leave gaps.")
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 4) - 1))
     ap.add_argument("--slot-preset", default="raptor", choices=sorted(SLOT_PRESETS),
                     help="'raptor' reproduces the public recipe; 'balanced' shifts budget "
@@ -220,6 +225,18 @@ def main(argv=None) -> int:
     grouped = {k: g.to_dict("records") for k, g in ser.groupby("StudyInstanceUID")}
 
     study_ids = [s for s in sorted(grouped) if (series_root / s).is_dir()]
+    if args.shard:
+        try:
+            i, n = (int(x) for x in args.shard.split("/"))
+        except ValueError:
+            raise SystemExit(f"--shard must look like I/N, got {args.shard!r}")
+        if not 1 <= i <= n:
+            raise SystemExit(f"--shard I must be in 1..N, got {args.shard!r}")
+        total = len(study_ids)
+        lo = (i - 1) * total // n
+        hi = i * total // n
+        study_ids = study_ids[lo:hi]
+        print(f"shard {i}/{n}: studies [{lo}:{hi}] of {total}", flush=True)
     if args.limit:
         study_ids = study_ids[:args.limit]
     print(f"studies to cache: {len(study_ids)}  ->  {out}", flush=True)

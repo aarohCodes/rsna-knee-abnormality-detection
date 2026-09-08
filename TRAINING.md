@@ -164,6 +164,45 @@ from its standalone score. Two ViTs that agree with each other add far less than
 ViT and a conv net that disagree.
 
 
+
+## Storage: you never need 500 GB
+
+The raw corpus is ~500 GB–1 TB, but nothing trains on raw DICOM. Everything decodes
+to a fixed cache first:
+
+| what | size |
+|---|---|
+| raw corpus | ~500 GB–1 TB — **never needed** |
+| cache, `raptor` (64 slices) | **27.7 GB** |
+| cache, `lean` (32 slices) | **13.5 GB** |
+| checkpoints + working space | ~5 GB |
+
+So the training box needs roughly **20–35 GB**, which matters on a shared machine
+with a quota'd home directory.
+
+**Two ways to get the cache there.** The second avoids downloading the corpus at all:
+
+| path | transfer | needs 500 GB scratch? |
+|---|---|---|
+| download raw → build cache locally | ~500 GB+ | yes |
+| **build cache on Kaggle → download the cache** | **13.5–27.7 GB** | **no** |
+
+`prep_cache.py` is **CPU-only** (pydicom + OpenCV), so the Kaggle route runs on a
+CPU notebook and **does not touch the 30h GPU quota**. Kaggle caps notebook output
+at ~20 GB, so:
+
+```bash
+# lean cache fits in ONE run
+python training/prep_cache.py --data-root /kaggle/input/... --out /kaggle/working/cache --slot-preset lean
+
+# the full 27.7 GB cache needs two, then publish each as a Dataset
+python training/prep_cache.py --data-root ... --out /kaggle/working/cache --shard 1/2
+python training/prep_cache.py --data-root ... --out /kaggle/working/cache --shard 2/2
+```
+
+`--shard I/N` takes a deterministic slice of the sorted study list, so shards never
+overlap and never leave gaps (verified: 1/2+2/2 covers [0:2]+[2:4] of 4).
+
 ## Three slot presets
 
 | preset | slices | cache | purpose |
