@@ -18,6 +18,12 @@ kernel stays built as a FREE side-bet** (selecting it costs nothing on the main
 board, because main-LB placement is the BEST of your selected submissions) **but it
 is not the plan.**
 
+### GPU box quickstart: see `GPU_BOX.md`
+Copy-paste runbook for `justingpu.utdallas.edu` (user `ananoti`; SSH key and
+config already present on the Windows box). **Step 1 is RECON and it gates
+everything** -- free disk decides whether to download the 500GB corpus or build the
+cache on a Kaggle CPU notebook instead (which does not touch the GPU quota).
+
 ### The arithmetic to 0.948
 | source | gain | evidence |
 |---|---|---|
