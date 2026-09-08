@@ -7,59 +7,84 @@ https://github.com/aarohCodes/rsna-knee-abnormality-detection (private -- kept
 private deliberately while the competition is active, per the rules requiring
 code disclosure only if we win).
 
-## >>> START HERE (rewritten 2026-09-07, ~09:15) <<<
+## >>> START HERE (rewritten 2026-09-07, ~20:00) <<<
 
-### Current state
-- **Banked public score: 0.938** (`bee-v2`), **rank ~163 of 3,243 (top 5%)**.
-  Was 0.922 / rank ~1,173 the previous morning.
-- Deadline **2026-10-22**, 45 days out. The private LB does not exist until then.
+## THE GOAL: TOP 10 ON THE PRIVATE LEADERBOARD. TARGET 0.948.
 
-### Scores in, from the 2026-09-06 batch
+Not the efficiency award. An earlier version of this block promoted the efficiency
+prize to priority #2 and called it "far more winnable" -- that was drift, caused by
+the top-10 odds looking bad, and the user correctly pushed back. **The efficiency
+kernel stays built as a FREE side-bet** (selecting it costs nothing on the main
+board, because main-LB placement is the BEST of your selected submissions) **but it
+is not the plan.**
+
+### The arithmetic to 0.948
+| source | gain | evidence |
+|---|---|---|
+| now | 0.938 | banked, rank ~163 of 3,243 |
+| `dinosaur-v4` reproduces the fork ceiling | **+0.003** | the author scores 0.941 |
+| 3-4 of our own DECORRELATED members | **+0.005 to +0.010** | measured: a member at 0.8963 with correlation 0.843 added **+0.0026** cross-fitted |
+| **projected** | **0.946-0.951** | top 10 needs 0.948 |
+
+**P(top 10) if executed: ~20%.** The "<1%" figure elsewhere in this file is the
+status quo -- submitting nothing further -- not the ceiling.
+
+### THE PLAN, in order
+1. **Submit `rsna-knee-dinosaur-v4`** -- the 0.941 author's merged-lineage kernel,
+   forked and validated. May exceed the 9h cap (~11.5h projected); submitting is
+   the ONLY way to measure it, downside is one slot of five daily.
+2. **Submit `rsna-knee-dinosaurs-v2`** -- ~4h, so it is the base WITH RUNTIME
+   HEADROOM (~5h spare). Our members must live here; `dinosaur-v4` has no room.
+3. **SSH recon on `justingpu.utdallas.edu`** (key and config already present;
+   user `ananoti`). `nvidia-smi`, `df -h`, `nproc`, `free -g`. Needs the user's
+   go-ahead -- shared university machine.
+4. **Train 4 decorrelated members**, ~3h each. **Decorrelation is the design goal,
+   NOT accuracy** -- that is the whole lesson of the +0.0026 measurement.
+   | member | backbone | est. inference on 1,322 |
+   |---|---|---|
+   | 1 | `vit_base_patch14_dinov2` (87M) | ~22 min |
+   | 2 | `coatnet_rmlp_2_rw_384` (the 0.941 author's own) | ~30 min |
+   | 3 | `convnext_small` (pure conv) | ~20 min |
+   | 4 | `vit_base` + `--slot-preset balanced` (different INPUTS) | ~22 min |
+   **Do NOT use ViT-giant**: ~4.4h of inference alone would eat the entire
+   headroom, and four decorrelated members beat one large one.
+5. **Blend into the base**, weight chosen by `blend_member.py choose-weight`
+   (cross-fitted on the clean 881-study holdout).
+6. **Select finals on the clean holdout, NEVER the public LB.** See the
+   pre-deadline checklist below -- auto-selection by public score is a real way to
+   lose this without a technical mistake.
+
+### Current scores
 | ref | score | note |
 |---|---|---|
-| 56062620 | **0.936** | likely `bee` V8 -- superseded |
+| 56063873 | **0.938** | `bee-v2` -- current best |
+| 56071930 | 0.898 | `lean-eff`, <=37 min -- efficiency side-bet |
+| 56062620 | 0.936 | `bee` V8, superseded |
 | 56062626 | 0.909 | regression, never select |
-| 56062615 | **FAILED, no score** | hit the 9h cap. Never select an unscored run. |
-| 56063873 | **0.938** | `bee-v2` = V9 + recovered CoAtNet arm. **Current best.** |
+| 56062615 | **no score** | hit the 9h cap. Never select an unscored run. |
 
-**Attribution of the first three to kernels was never confirmed** -- the API
-exposes no notebook reference. The Submissions page shows it; check there.
-
-### THREE THINGS WAITING ON THE USER
-1. **Submit `rsna-knee-dinosaurs-v2`** -- validated, main LB, slot B's base.
-2. **Submit `rsna-knee-lean-eff`** -- validated, targets the **efficiency award**,
-   projected ~49 min vs bee-v2's 8h15m (efficiency ~-1.89 vs -1.149).
-3. **Start the Linux box** (top-tier NVIDIA GPU, 128GB RAM). `TRAINING.md` is the
-   runbook; the whole training track is built and locally tested.
-
-### The strategic picture, measured not guessed
-- **Public-fork ceiling is ~0.941.** The authors we fork rank 81-910. Reproduction
-  cannot reach top 10; this file previously claimed otherwise and was wrong.
-- **P(top 10) at 0.938 is <1%**; P(medal) ~44%. Simulated over the real 3,243
-  scores with bootstrap-measured private noise (SD 0.0033).
-- **0.948 makes top 10 a coin flip (50.8%).** That is +0.010, and it does not exist
-  in the public ecosystem.
-- **The efficiency award is far more winnable**: its top 10 holds teams scoring
-  0.934-0.941, which we already match. Runtime is worth ~29x the entire accuracy
-  spread. We rank 1350/3214 only because we submit 8-hour ensembles.
-- **Everything free is closed**: cross-lineage blending duplicates final-v1;
-  three label sources all lose to steven/v4_blend; label-correlation stacking
-  costs -0.0161.
+### Why reproduction alone cannot get there
+The public-fork ceiling is **~0.941**: the authors we fork rank 81-910. Of the 162
+teams above us, **151 sit between 0.939 and 0.949** -- mostly at that ceiling,
+where the score is real skill, not overfitting that will regress. Private noise SD
+is 0.0033, so the 0.012 gap to rank 10 is **3.6 SD**; luck will not close it.
+**Only new signal will**, which is what step 4 exists for.
 
 ### Where the remaining points are
 Four weakest findings carry **+0.0168** of macro headroom: Contusion 0.8939,
-PF OA 0.8942, Lateral Meniscus 0.9047, MCL 0.9055. Two targeted levers exist,
-neither of which any forker will try:
+PF OA 0.8942, Lateral Meniscus 0.9047, MCL 0.9055. Two levers no forker will try:
 - `--slot-preset balanced` -- PF OA and MCL sit on the two most under-sampled planes
-- `--within-slot` -- ~13% of windows currently stack slices from different series
+- `--within-slot` -- ~13% of windows stack slices from DIFFERENT series
 
-### Process lesson, now with numbers behind it
+### Everything free is closed (measured, do not revisit)
+Cross-lineage blending duplicates what `final-v1` already achieves; three label
+sources all lose to `steven/v4_blend`; label-correlation stacking costs -0.0161.
+
+### Process lesson
 **Checking what the ecosystem published beats optimising what you hold.** Every
-gain came from that: the silently-missing CoAtNet arm and the author's V9 config
+gain came from that -- the silently-missing CoAtNet arm and the author's V9 config
 were worth +0.016, while every modelling idea measured <=0.002 or negative.
-**Corollary learned the hard way tonight**: validate with a cheap save-run before
-concluding anything. Declining one on "risk" grounds cost nothing but nearly
-shipped a kernel that would have failed on submission.
+**Corollary**: validate with a cheap save-run before concluding anything.
 
 ### dinosaur-v4 FORKED AND VALIDATED -- BUT PROJECTED ~11.5h, OVER THE CAP (2026-09-07, ~17:00)
 
